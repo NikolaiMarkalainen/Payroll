@@ -12,7 +12,7 @@ const appID = "com.nikolaimarkalainen.payroll"
 func Run() {
 	a := app.NewWithID(appID)
 	w := a.NewWindow("Palkkatarkistus")
-	w.Resize(fyne.NewSize(960, 640))
+	w.Resize(fyne.NewSize(1100, 720))
 	w.SetMaster()
 
 	content, tabs := buildUI()
@@ -37,10 +37,11 @@ func Run() {
 // buildUI constructs the main layout and returns it with the tab bar for tests.
 func buildUI() (fyne.CanvasObject, *container.AppTabs) {
 	settings := newSettingsTab()
+	shifts := newShiftsTab()
 
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Asetukset", settings.canvas()),
-		container.NewTabItem("Vuorot", emptyTab("Vuorot")),
+		container.NewTabItem("Vuorot", shifts.canvas()),
 		container.NewTabItem("PDF-tuonti", emptyTab("PDF-tuonti")),
 		container.NewTabItem("Laskelma", emptyTab("Laskelma")),
 		container.NewTabItem("Vertailu", emptyTab("Vertailu")),
