@@ -8,36 +8,40 @@ import (
 
 // Allowance indicator codes shown in calendar cells.
 const (
-	codeCallout     = "H"    // Hälytys
-	codeSunday      = "S"    // Sunnuntailisä
-	codeHoliday     = "P"    // Pyhälisä
-	codeEvening     = "I"    // Iltalisä
-	codeNight       = "Y"    // Yölisä
-	codeSaturday    = "L"    // Lauantailisä
-	codeOvertime50  = "50%"  // Ylityö 50 %
+	codeCallout = "H" // Hälytys
+	codeSunday = "S" // Sunnuntailisä
+	codeHoliday = "P" // Pyhälisä
+	codeEvening = "I" // Iltalisä
+	codeNight = "Y" // Yölisä
+	codeSaturday = "L" // Lauantailisä
+	codeOvertime50 = "50%" // Ylityö 50 %
 	codeOvertime100 = "100%" // Ylityö 100 %
 )
 
 // allowanceRules drives how day chips are calculated.
 type allowanceRules struct {
-	eveningStartMin   int // minutes from midnight
-	eveningEndMin     int
-	nightStartMin     int
-	nightEndMin       int // typically < nightStart (crosses midnight)
-	overtime50AfterH  float64
+	eveningStartMin int // minutes from midnight
+	eveningEndMin int
+	nightStartMin int
+	nightEndMin int // typically < nightStart (crosses midnight)
+	saturdayStartMin int // both 0 = whole Saturday
+	saturdayEndMin int
+	overtime50AfterH float64
 	overtime100AfterH float64
-	holidays          map[string]bool // keys: 2006-01-02
+	holidays map[string]bool // keys: 2006-01-02
 }
 
 func defaultAllowanceRules() allowanceRules {
 	return allowanceRules{
-		eveningStartMin:   18 * 60,
-		eveningEndMin:     22 * 60,
-		nightStartMin:     22 * 60,
-		nightEndMin:       6 * 60,
-		overtime50AfterH:  12, // TES 31 §: shift over 12 h → like OT 50%
+		eveningStartMin: 18 * 60,
+		eveningEndMin: 22 * 60,
+		nightStartMin: 22 * 60,
+		nightEndMin: 6 * 60,
+		saturdayStartMin: 0,
+		saturdayEndMin: 0,
+		overtime50AfterH: 12, // TES 31: shift over 12 h -> like OT 50%
 		overtime100AfterH: 18, // TES: first 18 such hours @50%, rest @100% (period)
-		holidays:          map[string]bool{},
+		holidays: map[string]bool{},
 	}
 }
 
@@ -47,10 +51,10 @@ func (r allowanceRules) withYearHolidays(year int) allowanceRules {
 		r.holidays = map[string]bool{}
 	}
 	fixed := []time.Time{
-		time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC),   // uudenvuodenpäivä
-		time.Date(year, 1, 6, 0, 0, 0, 0, time.UTC),   // loppiainen
-		time.Date(year, 5, 1, 0, 0, 0, 0, time.UTC),   // vappu
-		time.Date(year, 12, 6, 0, 0, 0, 0, time.UTC),  // itsenäisyyspäivä
+		time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC), // uudenvuodenpäivä
+		time.Date(year, 1, 6, 0, 0, 0, 0, time.UTC), // loppiainen
+		time.Date(year, 5, 1, 0, 0, 0, 0, time.UTC), // vappu
+		time.Date(year, 12, 6, 0, 0, 0, 0, time.UTC), // itsenäisyyspäivä
 		time.Date(year, 12, 24, 0, 0, 0, 0, time.UTC), // jouluaatto (often paid as holiday in TES contexts)
 		time.Date(year, 12, 25, 0, 0, 0, 0, time.UTC), // joulupäivä
 		time.Date(year, 12, 26, 0, 0, 0, 0, time.UTC), // tapaninpäivä
@@ -63,26 +67,26 @@ func (r allowanceRules) withYearHolidays(year int) allowanceRules {
 
 // dayAllowances is premium-hour totals for one calendar day.
 type dayAllowances struct {
-	Total       float64
-	Callout     float64
-	Sunday      float64
-	Holiday     float64
-	Evening     float64
-	Night       float64
-	Saturday    float64
-	Overtime50  float64
+	Total float64
+	Callout float64
+	Sunday float64
+	Holiday float64
+	Evening float64
+	Night float64
+	Saturday float64
+	Overtime50 float64
 	Overtime100 float64
 }
 
 type allowanceChip struct {
-	Code  string
+	Code string
 	Hours float64
 }
 
 func (d dayAllowances) chips() []allowanceChip {
 	type item struct {
 		code string
-		h    float64
+		h float64
 	}
 	order := []item{
 		{codeCallout, d.Callout},
@@ -162,7 +166,13 @@ func summarizeDay(date time.Time, shifts []calendarShift, rules allowanceRules) 
 			out.Sunday += hours
 		}
 		if isSat {
-			out.Saturday += hours
+			if rules.saturdayStartMin == 0 && rules.saturdayEndMin == 0 {
+				out.Saturday += hours
+			} else {
+				sat0 := dayStart.Add(time.Duration(rules.saturdayStartMin) * time.Minute)
+				sat1 := dayStart.Add(time.Duration(rules.saturdayEndMin) * time.Minute)
+				out.Saturday += overlapHours(clipStart, clipEnd, [2]time.Time{sat0, sat1})
+			}
 		}
 		if isHol {
 			out.Holiday += hours
@@ -172,7 +182,7 @@ func summarizeDay(date time.Time, shifts []calendarShift, rules allowanceRules) 
 		out.Evening += eve
 		out.Night += night
 
-		// TES 31 §: hours over overtime50AfterH on the full continuous shift,
+		// TES 31: hours over overtime50AfterH on the full continuous shift,
 		// attributed to this calendar day where the extension tail falls.
 		if rules.overtime50AfterH > 0 {
 			fullDur := absEnd.Sub(absStart).Hours()
@@ -211,7 +221,7 @@ func summarizeDay(date time.Time, shifts []calendarShift, rules allowanceRules) 
 }
 
 // splitOvertime splits daily hours into 50% and 100% overtime buckets.
-// Example (TES-typical): after50=8, after100=10 → hours 8–10 at 50%, hours after 10 at 100%.
+// Example (TES-typical): after50=8, after100=10 -> hours 8-10 at 50%, hours after 10 at 100%.
 func splitOvertime(total, after50, after100 float64) (ot50, ot100 float64) {
 	if after50 < 0 {
 		after50 = 0

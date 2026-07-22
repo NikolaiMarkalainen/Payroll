@@ -20,10 +20,10 @@ func TestSettingsDefaults(t *testing.T) {
 		t.Fatalf("rest %%=%q", s.restViolationPercent.Text)
 	}
 	if s.eveningStart.value() != "18:00" || s.eveningEnd.value() != "22:00" {
-		t.Fatalf("evening=%s–%s", s.eveningStart.value(), s.eveningEnd.value())
+		t.Fatalf("evening=%s-%s", s.eveningStart.value(), s.eveningEnd.value())
 	}
 	if s.nightStart.value() != "22:00" || s.nightEnd.value() != "06:00" {
-		t.Fatalf("night=%s–%s", s.nightStart.value(), s.nightEnd.value())
+		t.Fatalf("night=%s-%s", s.nightStart.value(), s.nightEnd.value())
 	}
 	if s.overtime50After.Text != "12" || s.overtime100After.Text != "18" {
 		t.Fatalf("overtime thresholds=%q/%q", s.overtime50After.Text, s.overtime100After.Text)

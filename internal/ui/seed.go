@@ -3,7 +3,7 @@ package ui
 import "time"
 
 // demoRosterShifts is sample data from a real roster export (järjestyksenvalvoja),
-// Jul–Aug 2026. "Vt" days are omitted (vuosiloma / vapaata).
+// Jul-Aug 2026. "Vt" days are omitted (vuosiloma / vapaata).
 // Reported total on the sheet: 98:50.
 func demoRosterShifts(loc *time.Location) []calendarShift {
 	if loc == nil {
@@ -11,9 +11,9 @@ func demoRosterShifts(loc *time.Location) []calendarShift {
 	}
 	type row struct {
 		month time.Month
-		day   int
+		day int
 		start string
-		end   string
+		end string
 	}
 	rows := []row{
 		{7, 20, "04:55", "16:55"},
@@ -30,9 +30,9 @@ func demoRosterShifts(loc *time.Location) []calendarShift {
 	out := make([]calendarShift, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, calendarShift{
-			Date:  time.Date(2026, r.month, r.day, 0, 0, 0, 0, loc),
+			Date: time.Date(2026, r.month, r.day, 0, 0, 0, 0, loc),
 			Start: r.start,
-			End:   r.end,
+			End: r.end,
 		})
 	}
 	return out

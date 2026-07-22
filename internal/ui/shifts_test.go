@@ -41,9 +41,9 @@ func TestAddShiftShowsInCell(t *testing.T) {
 	_ = s.canvas()
 	day := time.Date(s.month.Year(), s.month.Month(), 15, 0, 0, 0, 0, s.month.Location())
 	if err := s.addShift(calendarShift{
-		Date:    day,
-		Start:   "06:00",
-		End:     "14:00",
+		Date: day,
+		Start: "06:00",
+		End: "14:00",
 		Callout: true,
 	}); err != nil {
 		t.Fatal(err)

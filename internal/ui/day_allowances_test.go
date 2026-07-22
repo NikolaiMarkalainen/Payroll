@@ -84,7 +84,7 @@ func TestSummarizeDayCalloutAndOvertime(t *testing.T) {
 		Date: day, Start: "06:00", End: "16:00", Callout: true,
 	}}
 	got := summarizeDay(day, shifts, rules)
-	// 10h total → under 12h shift OT threshold
+	// 10h total -> under 12h shift OT threshold
 	if got.Total != 10 || got.Callout != 10 || got.Overtime50 != 0 || got.Overtime100 != 0 {
 		t.Fatalf("got=%+v", got)
 	}
@@ -93,7 +93,7 @@ func TestSummarizeDayCalloutAndOvertime(t *testing.T) {
 		Date: day, Start: "06:00", End: "18:00", Callout: true,
 	}}
 	got = summarizeDay(day, shifts, rules)
-	// exactly 12h → no extension OT
+	// exactly 12h -> no extension OT
 	if got.Total != 12 || got.Overtime50 != 0 || got.Overtime100 != 0 {
 		t.Fatalf("12h day got=%+v", got)
 	}
@@ -102,7 +102,7 @@ func TestSummarizeDayCalloutAndOvertime(t *testing.T) {
 		Date: day, Start: "06:00", End: "20:00", Callout: true,
 	}}
 	got = summarizeDay(day, shifts, rules)
-	// 14h → 2h extension @ 50% chip
+	// 14h -> 2h extension @ 50% chip
 	if got.Total != 14 || got.Overtime50 != 2 || got.Overtime100 != 0 {
 		t.Fatalf("14h day got=%+v", got)
 	}
@@ -111,15 +111,15 @@ func TestSummarizeDayCalloutAndOvertime(t *testing.T) {
 func TestSplitOvertime50And100(t *testing.T) {
 	ot50, ot100 := splitOvertime(12, 8, 10)
 	if ot50 != 2 || ot100 != 2 {
-		t.Fatalf("12h → 50%%=%v 100%%=%v want 2/2", ot50, ot100)
+		t.Fatalf("12h -> 50%%=%v 100%%=%v want 2/2", ot50, ot100)
 	}
 	ot50, ot100 = splitOvertime(9, 8, 10)
 	if ot50 != 1 || ot100 != 0 {
-		t.Fatalf("9h → %v/%v", ot50, ot100)
+		t.Fatalf("9h -> %v/%v", ot50, ot100)
 	}
 	ot50, ot100 = splitOvertime(8, 8, 10)
 	if ot50 != 0 || ot100 != 0 {
-		t.Fatalf("8h → %v/%v", ot50, ot100)
+		t.Fatalf("8h -> %v/%v", ot50, ot100)
 	}
 }
 

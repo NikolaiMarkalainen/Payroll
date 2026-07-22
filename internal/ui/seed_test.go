@@ -17,7 +17,7 @@ func TestDemoRosterTotalMatchesSheet(t *testing.T) {
 		s, err1 := clockToMinutes(sh.Start)
 		e, err2 := clockToMinutes(sh.End)
 		if err1 != nil || err2 != nil {
-			t.Fatalf("bad time %s–%s", sh.Start, sh.End)
+			t.Fatalf("bad time %s-%s", sh.Start, sh.End)
 		}
 		if e <= s {
 			t.Fatalf("overnight not expected in demo: %+v", sh)
@@ -109,6 +109,8 @@ func TestTrainingAllowanceInRates(t *testing.T) {
 	test.NewApp()
 	s := newSettingsTab()
 	_ = s.canvas()
+	// Koulutuslisä is Vartio-only; default Oma hides the section -> Training stays 0.
+	s.applyVartiointiPay("Taso IV", true, tesServicePerus)
 	s.hourlyWage.SetText("10.00")
 	s.trainingAllowance.SetText("0.25")
 	s.trainingEnabled.SetChecked(false)

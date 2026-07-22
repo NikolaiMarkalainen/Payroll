@@ -22,11 +22,11 @@ func TestOvernightSegmentsSplitAcrossDays(t *testing.T) {
 	}
 
 	startSegs := s.segmentsOn(day)
-	if len(startSegs) != 1 || startSegs[0].Label != "22:00–24:00" || !startSegs[0].Continues {
+	if len(startSegs) != 1 || startSegs[0].Label != "22:00-24:00" || !startSegs[0].Continues {
 		t.Fatalf("start day segments=%+v", startSegs)
 	}
 	endSegs := s.segmentsOn(next)
-	if len(endSegs) != 1 || endSegs[0].Label != "00:00–06:00" || !endSegs[0].Continuation {
+	if len(endSegs) != 1 || endSegs[0].Label != "00:00-06:00" || !endSegs[0].Continuation {
 		t.Fatalf("next day segments=%+v", endSegs)
 	}
 	if startSegs[0].Shift.ID != endSegs[0].Shift.ID {

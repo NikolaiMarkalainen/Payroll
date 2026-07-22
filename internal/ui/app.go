@@ -65,9 +65,9 @@ func buildUI(w fyne.Window) (fyne.CanvasObject, *container.AppTabs, *shiftsTab) 
 	)
 	tabs.SetTabLocation(container.TabLocationTop)
 
-	// Expose calc tab for demo range via shifts pointer side-channel.
+	// Demo loads roster + calc date range only. Do NOT apply Vartiointi TES —
+	// that left profile selectors (taso) sticky when switching back to Oma.
 	shifts.onDemoLoaded = func() {
-		settings.applyDemoTES()
 		calcView.setDemoRange()
 	}
 
@@ -87,7 +87,7 @@ func buildUI(w fyne.Window) (fyne.CanvasObject, *container.AppTabs, *shiftsTab) 
 }
 
 func emptyTab(name string) fyne.CanvasObject {
-	label := widget.NewLabel(name + " — sisältö lisätään myöhemmin.")
+	label := widget.NewLabel(name + " - sisältö lisätään myöhemmin.")
 	label.Wrapping = fyne.TextWrapWord
 	return container.NewPadded(label)
 }

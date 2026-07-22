@@ -14,13 +14,13 @@ import (
 // tapBox makes arbitrary content clickable, with hover/press feedback.
 type tapBox struct {
 	widget.BaseWidget
-	content   fyne.CanvasObject
-	bg        *canvas.Rectangle
-	onTap     func()
-	minWidth  float32
+	content fyne.CanvasObject
+	bg *canvas.Rectangle
+	onTap func()
+	minWidth float32
 	minHeight float32
-	hovered   bool
-	pressed   bool
+	hovered bool
+	pressed bool
 }
 
 func newTapBox(content fyne.CanvasObject, onTap func()) *tapBox {
@@ -28,8 +28,8 @@ func newTapBox(content fyne.CanvasObject, onTap func()) *tapBox {
 	bg.CornerRadius = 4
 	t := &tapBox{
 		content: container.NewStack(bg, content),
-		bg:      bg,
-		onTap:   onTap,
+		bg: bg,
+		onTap: onTap,
 	}
 	t.ExtendBaseWidget(t)
 	return t

@@ -22,22 +22,22 @@ var finnishMonths = []string{
 
 // calendarShift is a shift shown inside a day cell.
 type calendarShift struct {
-	ID      int
-	Date    time.Time
-	Start   string
-	End     string
+	ID int
+	Date time.Time
+	Start string
+	End string
 	Callout bool // Hälytysvuoro
 }
 
 type shiftsTab struct {
-	window       fyne.Window
-	month        time.Time
-	shifts       []calendarShift
-	nextID       int
-	title        *widget.Label
-	grid         *fyne.Container
-	content      fyne.CanvasObject
-	rules        func() allowanceRules
+	window fyne.Window
+	month time.Time
+	shifts []calendarShift
+	nextID int
+	title *widget.Label
+	grid *fyne.Container
+	content fyne.CanvasObject
+	rules func() allowanceRules
 	onDemoLoaded func()
 }
 
@@ -45,10 +45,10 @@ func newShiftsTab(w fyne.Window) *shiftsTab {
 	now := time.Now()
 	s := &shiftsTab{
 		window: w,
-		month:  time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()),
-		title:  widget.NewLabel(""),
+		month: time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()),
+		title: widget.NewLabel(""),
 		nextID: 1,
-		rules:  defaultAllowanceRules,
+		rules: defaultAllowanceRules,
 	}
 	s.title.TextStyle = fyne.TextStyle{Bold: true}
 	s.title.Alignment = fyne.TextAlignCenter
@@ -88,7 +88,7 @@ func (s *shiftsTab) currentRules() allowanceRules {
 }
 
 func (s *shiftsTab) canvas() fyne.CanvasObject {
-	hint := widget.NewLabel("Klikkaa päivää lisätäksesi vuoron. Klikkaa vuoroa muokataksesi. Poista ✕-napilla.")
+	hint := widget.NewLabel("Klikkaa päivää lisätäksesi vuoron. Klikkaa vuoroa muokataksesi. Poista X-napilla.")
 	hint.Wrapping = fyne.TextWrapWord
 
 	heading := widget.NewLabel("Vuorokalenteri")
@@ -198,7 +198,7 @@ func (s *shiftsTab) shiftRow(seg shiftSegment) fyne.CanvasObject {
 		s.openEditShiftDialog(target)
 	})
 
-	del := widget.NewButton("✕", func() {
+	del := widget.NewButton("X", func() {
 		s.confirmDeleteShift(target)
 	})
 	del.Importance = widget.LowImportance
@@ -275,9 +275,9 @@ func (s *shiftsTab) openShiftDialog(date time.Time, existing *calendarShift) {
 				return
 			}
 			sh := calendarShift{
-				Date:    date,
-				Start:   startPicker.value(),
-				End:     endPicker.value(),
+				Date: date,
+				Start: startPicker.value(),
+				End: endPicker.value(),
 				Callout: callout.Checked,
 			}
 			var err error
@@ -305,9 +305,9 @@ func (s *shiftsTab) confirmDeleteShift(sh calendarShift) {
 		s.removeShift(sh.ID)
 		return
 	}
-	msg := fmt.Sprintf("Oletko varma, että haluat poistaa vuoron %s–%s?", sh.Start, sh.End)
+	msg := fmt.Sprintf("Oletko varma, että haluat poistaa vuoron %s-%s?", sh.Start, sh.End)
 	if sh.Callout {
-		msg = fmt.Sprintf("Oletko varma, että haluat poistaa hälytysvuoron %s–%s?", sh.Start, sh.End)
+		msg = fmt.Sprintf("Oletko varma, että haluat poistaa hälytysvuoron %s-%s?", sh.Start, sh.End)
 	}
 	dialog.ShowConfirm("Poista vuoro", msg, func(ok bool) {
 		if ok {

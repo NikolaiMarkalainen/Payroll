@@ -11,20 +11,20 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// timePicker is HH:MM via numeric entry fields (hour 1–24, minute 0–59).
+// timePicker is HH:MM via numeric entry fields (hour 1-24, minute 0-59).
 type timePicker struct {
-	hour   *widget.Entry
+	hour *widget.Entry
 	minute *widget.Entry
-	err    *widget.Label
-	box    *fyne.Container
+	err *widget.Label
+	box *fyne.Container
 }
 
 func newTimePicker(initial string) *timePicker {
 	h, m := parseClock(initial)
 	tp := &timePicker{
-		hour:   newClockEntry(h),
+		hour: newClockEntry(h),
 		minute: newClockEntry(m),
-		err:    widget.NewLabel(""),
+		err: widget.NewLabel(""),
 	}
 	tp.err.Importance = widget.DangerImportance
 	tp.err.Hide()
@@ -108,7 +108,7 @@ func (tp *timePicker) refreshError() {
 		tp.err.Hide()
 		return
 	}
-	tp.err.SetText("Virheellinen aika (tunnit 1–24, minuutit 0–59)")
+	tp.err.SetText("Virheellinen aika (tunnit 1-24, minuutit 0-59)")
 	tp.err.Show()
 }
 

@@ -50,7 +50,7 @@ func allowanceLegend() fyne.CanvasObject {
 	parts := make([]fyne.CanvasObject, 0, len(items)*2)
 	for i, it := range items {
 		if i > 0 {
-			sep := canvas.NewText("·", color.NRGBA{R: 0x88, G: 0x88, B: 0x88, A: 0xff})
+			sep := canvas.NewText("|", color.NRGBA{R: 0x88, G: 0x88, B: 0x88, A: 0xff})
 			sep.TextSize = 11
 			parts = append(parts, sep)
 		}

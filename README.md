@@ -48,6 +48,8 @@ go install github.com/air-verse/air@latest
 make air
 ```
 
+`make air` / `-demo` lataa esimerkkivuorot, mutta ei pakota Vartiointi-TES:ää — Asetukset alkaa Omasta (tyhjä).
+
 ## Rakenne
 
 ```

@@ -47,7 +47,7 @@ func TestCalcTabRunsForDemoRange(t *testing.T) {
 		t.Fatalf("err=%q", c.err.Text)
 	}
 	if !strings.Contains(c.summary.Text, "98.83") && !strings.Contains(c.summary.Text, "98.80") {
-		// 98:50 = 98 + 50/60 ≈ 98.833… rounded to 98.83
+		// 98:50 = 98 + 50/60 ≈ 98.833... rounded to 98.83
 		if !strings.Contains(c.summary.Text, "98.") {
 			t.Fatalf("summary missing hours: %q", c.summary.Text)
 		}
@@ -76,6 +76,6 @@ func TestCalcTabFillFromShifts(t *testing.T) {
 	_ = c.canvas()
 	c.fillFromShifts()
 	if c.from.Text != "20.07.2026" || c.to.Text != "04.08.2026" {
-		t.Fatalf("range=%s–%s", c.from.Text, c.to.Text)
+		t.Fatalf("range=%s-%s", c.from.Text, c.to.Text)
 	}
 }

@@ -14,26 +14,26 @@ import (
 
 type calcTab struct {
 	settings *settingsTab
-	shifts   *shiftsTab
-	from     *widget.Entry
-	to       *widget.Entry
-	absence  *widget.Entry
-	err      *widget.Label
-	summary  *widget.Label
-	details  *widget.Label
-	calcBtn  *widget.Button
+	shifts *shiftsTab
+	from *widget.Entry
+	to *widget.Entry
+	absence *widget.Entry
+	err *widget.Label
+	summary *widget.Label
+	details *widget.Label
+	calcBtn *widget.Button
 }
 
 func newCalcTab(settings *settingsTab, shifts *shiftsTab) *calcTab {
 	c := &calcTab{
 		settings: settings,
-		shifts:   shifts,
-		from:     widget.NewEntry(),
-		to:       widget.NewEntry(),
-		absence:  widget.NewEntry(),
-		err:      widget.NewLabel(""),
-		summary:  widget.NewLabel("Laskentaa ei ole vielä ajettu."),
-		details:  widget.NewLabel(""),
+		shifts: shifts,
+		from: widget.NewEntry(),
+		to: widget.NewEntry(),
+		absence: widget.NewEntry(),
+		err: widget.NewLabel(""),
+		summary: widget.NewLabel("Laskentaa ei ole vielä ajettu."),
+		details: widget.NewLabel(""),
 	}
 	c.err.Importance = widget.DangerImportance
 	c.err.Hide()
@@ -58,7 +58,7 @@ func newCalcTab(settings *settingsTab, shifts *shiftsTab) *calcTab {
 }
 
 func (c *calcTab) canvas() fyne.CanvasObject {
-	hint := widget.NewLabel("Valitse aikaväli (mieluiten yksi 3 vk jakso) ja laske TES-pohjainen palkka. Poissaolotunnit (loma 6,7 h/pv, sairaus listan mukaan, arkipyhä, vuosivapaa…) lasketaan mukaan jaksoylityöhön.")
+	hint := widget.NewLabel("Valitse aikaväli (mieluiten yksi 3 vk jakso) ja laske TES-pohjainen palkka. Poissaolotunnit (loma 6,7 h/pv, sairaus listan mukaan, arkipyhä, vuosivapaa...) lasketaan mukaan jaksoylityöhön.")
 	hint.Wrapping = fyne.TextWrapWord
 
 	heading := widget.NewLabel("Laskelma")
@@ -180,11 +180,11 @@ func (c *calcTab) run() {
 	absence := entryFloatOr(c.absence, 0)
 
 	in := calc.PeriodInput{
-		From:             from,
-		To:               to,
-		Shifts:           c.shifts.toCalcShifts(),
-		Rates:            c.settings.rates(),
-		Rules:            rules,
+		From: from,
+		To: to,
+		Shifts: c.shifts.toCalcShifts(),
+		Rates: c.settings.rates(),
+		Rules: rules,
 		CreditedAbsenceH: absence,
 	}
 	out := calc.Calculate(in)
@@ -213,6 +213,12 @@ func formatCalcSummary(from, to time.Time, out calc.Breakdown, rules calc.Rules)
 
 func formatCalcDetails(out calc.Breakdown, rules calc.Rules) string {
 	var b strings.Builder
+	ot50Label := "Ylityö 50 %"
+	ot100Label := "Ylityö 100 %"
+	if rules.ShiftOTAfterH > 0 {
+		ot50Label = "Pidennysylityö 50 % (TES 31)"
+		ot100Label = "Pidennysylityö 100 % (yli 18 h jaksossa)"
+	}
 	b.WriteString(fmt.Sprintf(
 		"Pohja: %.2f h / %.2f e\n"+
 			"Kokemuslisä: %.2f h / %.2f e\n"+
@@ -220,25 +226,30 @@ func formatCalcDetails(out calc.Breakdown, rules calc.Rules) string {
 			"Koulutuslisä: %.2f h / %.2f e\n"+
 			"Muu lisä: %.2f e\n"+
 			"Iltalisä: %.2f h / %.2f e\n"+
+			"Iltalisä 2x: %.2f h\n"+
 			"Yölisä: %.2f h / %.2f e\n"+
 			"Lauantai: %.2f h / %.2f e\n"+
 			"Sunnuntai: %.2f h / %.2f e\n"+
 			"Pyhä: %.2f h / %.2f e\n"+
-			"Pidennysylityö 50 %% (TES 31 §): %.2f h / %.2f e\n"+
-			"Pidennysylityö 100 %% (yli 18 h jaksossa): %.2f h / %.2f e\n",
+			"%s: %.2f h / %.2f e\n"+
+			"%s: %.2f h / %.2f e\n",
 		out.BaseHours, out.BasePay,
 		out.BaseHours, out.ExperiencePay,
 		out.BaseHours, out.PersonalPay,
 		out.BaseHours, out.TrainingPay,
 		out.OtherPay,
 		out.EveningHours, out.EveningPay,
+		out.EveningDoubleHours,
 		out.NightHours, out.NightPay,
 		out.SaturdayHours, out.SaturdayPay,
 		out.SundayHours, out.SundayPay,
 		out.HolidayHours, out.HolidayPay,
-		out.Overtime50Hours, out.Overtime50Pay,
-		out.Overtime100Hours, out.Overtime100Pay,
+		ot50Label, out.Overtime50Hours, out.Overtime50Pay,
+		ot100Label, out.Overtime100Hours, out.Overtime100Pay,
 	))
+	if rules.WeeklyOTEnabled && out.WeeklyOT50Hours > 0 {
+		b.WriteString(fmt.Sprintf("Viikkoylitys 50 %%: %.2f h (sis. yllä olevaan 50 %%:iin)\n", out.WeeklyOT50Hours))
+	}
 	if rules.PeriodOTEnabled {
 		b.WriteString(fmt.Sprintf(
 			"Jaksoylityö 50 %% (ensimmäiset 18 h): %.2f h / %.2f e\n"+
@@ -286,7 +297,9 @@ func (s *shiftsTab) toCalcShifts() []calc.Shift {
 
 func (s *settingsTab) rates() calc.Rates {
 	training := 0.0
-	if s.trainingEnabled != nil && s.trainingEnabled.Checked {
+	if s.trainingSection != nil && !s.trainingSection.Visible() {
+		training = 0
+	} else if s.trainingEnabled != nil && s.trainingEnabled.Checked {
 		training = entryFloatOr(s.trainingAllowance, 0)
 	}
 	var otherH, otherF float64
@@ -300,42 +313,59 @@ func (s *settingsTab) rates() calc.Rates {
 		}
 	}
 	return calc.Rates{
-		Hourly:      entryFloatOr(s.hourlyWage, 0),
-		Experience:  entryFloatOr(s.experienceAllowance, 0),
-		Personal:    entryFloatOr(s.personalAllowance, 0),
-		Training:    training,
+		Hourly: entryFloatOr(s.hourlyWage, 0),
+		Experience: entryFloatOr(s.experienceAllowance, 0),
+		Personal: entryFloatOr(s.personalAllowance, 0),
+		Training: training,
 		OtherHourly: otherH,
-		OtherFixed:  otherF,
-		Evening:     entryFloatOr(s.eveningAllowance, 0),
-		Night:       entryFloatOr(s.nightAllowance, 0),
-		Saturday:    entryFloatOr(s.saturdayAllowance, 0),
-		Sunday:      entryFloatOr(s.sundayAllowance, 0),
-		Holiday:     entryFloatOr(s.holidayAllowance, 0),
+		OtherFixed: otherF,
+		Evening: entryFloatOr(s.eveningAllowance, 0),
+		EveningDouble: entryFloatOr(s.eveningDoubleAllowance, 0),
+		Night: entryFloatOr(s.nightAllowance, 0),
+		Saturday: entryFloatOr(s.saturdayAllowance, 0),
+		Sunday: entryFloatOr(s.sundayAllowance, 0),
+		Holiday: entryFloatOr(s.holidayAllowance, 0),
 	}
 }
 
 func (s *settingsTab) calcRules() calc.Rules {
 	ar := s.allowanceRules()
-	shiftAfter := ar.overtime50AfterH
-	if shiftAfter <= 0 {
-		shiftAfter = calc.ShiftOTAfterHDefault
-	}
-	cap100 := ar.overtime100AfterH
-	if cap100 <= 0 {
-		cap100 = calc.ShiftOT50CapHDefault
-	}
 	r := calc.Rules{
-		EveningStartMin:   ar.eveningStartMin,
-		EveningEndMin:     ar.eveningEndMin,
-		NightStartMin:     ar.nightStartMin,
-		NightEndMin:       ar.nightEndMin,
-		Overtime50AfterH:  ar.overtime50AfterH,
+		EveningStartMin: ar.eveningStartMin,
+		EveningEndMin: ar.eveningEndMin,
+		NightStartMin: ar.nightStartMin,
+		NightEndMin: ar.nightEndMin,
+		SaturdayStartMin: ar.saturdayStartMin,
+		SaturdayEndMin: ar.saturdayEndMin,
+		EveningExcludeSaturday: s.eveningExcludeSaturday != nil && s.eveningExcludeSaturday.Checked,
+		NightExcludeSunday: s.nightExcludeSunday != nil && s.nightExcludeSunday.Checked,
+		NightExcludeHoliday: s.nightExcludeHoliday != nil && s.nightExcludeHoliday.Checked,
+		EveningDoubleMonthFrom: s.eveningDoubleMonthFrom,
+		EveningDoubleMonthTo: s.eveningDoubleMonthTo,
+		EveningDoubleSundayOnly: s.eveningDoubleSundayOnly,
+		Overtime50AfterH: ar.overtime50AfterH,
 		Overtime100AfterH: ar.overtime100AfterH,
-		ShiftOTAfterH:     shiftAfter,
-		ShiftOT50CapH:     cap100,
-		PeriodOTEnabled:   s.periodOTEnabled != nil && s.periodOTEnabled.Checked,
-		PeriodThresholdH:  calc.PeriodThreshold120,
-		PeriodOT50AfterH:  calc.DefaultPeriodOT50H,
+		PeriodOTEnabled: s.periodOTEnabled != nil && s.periodOTEnabled.Checked,
+		PeriodThresholdH: calc.PeriodThreshold120,
+		PeriodOT50AfterH: calc.DefaultPeriodOT50H,
+		WeeklyOTEnabled: s.weeklyOTEnabled != nil && s.weeklyOTEnabled.Checked,
+		WeeklyOTThresholdH: entryFloatOr(s.weeklyOTThreshold, 37.5),
+	}
+	useShiftOT := s.shiftOTEnabled == nil || s.shiftOTEnabled.Checked
+	if useShiftOT {
+		shiftAfter := ar.overtime50AfterH
+		if shiftAfter <= 0 {
+			shiftAfter = calc.ShiftOTAfterHDefault
+		}
+		cap100 := ar.overtime100AfterH
+		if cap100 <= 0 {
+			cap100 = calc.ShiftOT50CapHDefault
+		}
+		r.ShiftOTAfterH = shiftAfter
+		r.ShiftOT50CapH = cap100
+	} else {
+		r.ShiftOTAfterH = 0
+		r.ShiftOT50CapH = 0
 	}
 	return r
 }

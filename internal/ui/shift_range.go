@@ -8,11 +8,11 @@ import (
 )
 
 // shiftSegment is one visual block of a shift on a calendar day.
-// Overnight shifts (e.g. 22:00–06:00) render as two segments on consecutive days.
+// Overnight shifts (e.g. 22:00-06:00) render as two segments on consecutive days.
 type shiftSegment struct {
-	Shift        calendarShift
-	Label        string
-	Continues    bool // ends at midnight, continues next day
+	Shift calendarShift
+	Label string
+	Continues bool // ends at midnight, continues next day
 	Continuation bool // started previous day
 }
 
@@ -100,14 +100,14 @@ func (s *shiftsTab) segmentsOn(date time.Time) []shiftSegment {
 		if sameDate(sh.Date, date) {
 			if overnight {
 				out = append(out, shiftSegment{
-					Shift:     sh,
-					Label:     formatShiftLabel(sh, sh.Start+"–24:00"),
+					Shift: sh,
+					Label: formatShiftLabel(sh, sh.Start+"-24:00"),
 					Continues: true,
 				})
 			} else {
 				out = append(out, shiftSegment{
 					Shift: sh,
-					Label: formatShiftLabel(sh, sh.Start+"–"+sh.End),
+					Label: formatShiftLabel(sh, sh.Start+"-"+sh.End),
 				})
 			}
 		}
@@ -116,8 +116,8 @@ func (s *shiftsTab) segmentsOn(date time.Time) []shiftSegment {
 			next := sh.Date.AddDate(0, 0, 1)
 			if sameDate(next, date) {
 				out = append(out, shiftSegment{
-					Shift:        sh,
-					Label:        formatShiftLabel(sh, "00:00–"+sh.End),
+					Shift: sh,
+					Label: formatShiftLabel(sh, "00:00-"+sh.End),
 					Continuation: true,
 				})
 			}
