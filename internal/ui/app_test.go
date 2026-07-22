@@ -8,10 +8,11 @@ import (
 
 func TestBuildUIHasExpectedTabs(t *testing.T) {
 	test.NewApp()
-
-	content, tabs := buildUI()
-	w := test.NewWindow(content)
+	w := test.NewWindow(nil)
 	defer w.Close()
+
+	content, tabs := buildUI(w)
+	w.SetContent(content)
 
 	want := []string{"Asetukset", "Vuorot", "PDF-tuonti", "Laskelma", "Vertailu"}
 	if len(tabs.Items) != len(want) {

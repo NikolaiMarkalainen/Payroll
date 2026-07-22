@@ -15,7 +15,7 @@ func Run() {
 	w.Resize(fyne.NewSize(1100, 720))
 	w.SetMaster()
 
-	content, tabs := buildUI()
+	content, tabs := buildUI(w)
 	w.SetContent(content)
 
 	w.SetMainMenu(fyne.NewMainMenu(
@@ -35,9 +35,11 @@ func Run() {
 }
 
 // buildUI constructs the main layout and returns it with the tab bar for tests.
-func buildUI() (fyne.CanvasObject, *container.AppTabs) {
+func buildUI(w fyne.Window) (fyne.CanvasObject, *container.AppTabs) {
 	settings := newSettingsTab()
-	shifts := newShiftsTab()
+	shifts := newShiftsTab(w)
+	shifts.rules = settings.allowanceRules
+	settings.onSaved = func() { shifts.refresh() }
 
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Asetukset", settings.canvas()),

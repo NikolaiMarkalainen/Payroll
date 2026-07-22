@@ -7,6 +7,8 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
@@ -20,24 +22,32 @@ var finnishMonths = []string{
 
 // calendarShift is a shift shown inside a day cell.
 type calendarShift struct {
-	Date  time.Time
-	Start string
-	End   string
+	ID      int
+	Date    time.Time
+	Start   string
+	End     string
+	Callout bool // Hälytysvuoro
 }
 
 type shiftsTab struct {
+	window  fyne.Window
 	month   time.Time
 	shifts  []calendarShift
+	nextID  int
 	title   *widget.Label
 	grid    *fyne.Container
 	content fyne.CanvasObject
+	rules   func() allowanceRules
 }
 
-func newShiftsTab() *shiftsTab {
+func newShiftsTab(w fyne.Window) *shiftsTab {
 	now := time.Now()
 	s := &shiftsTab{
-		month: time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()),
-		title: widget.NewLabel(""),
+		window: w,
+		month:  time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()),
+		title:  widget.NewLabel(""),
+		nextID: 1,
+		rules:  defaultAllowanceRules,
 	}
 	s.title.TextStyle = fyne.TextStyle{Bold: true}
 	s.title.Alignment = fyne.TextAlignCenter
@@ -46,8 +56,15 @@ func newShiftsTab() *shiftsTab {
 	return s
 }
 
+func (s *shiftsTab) currentRules() allowanceRules {
+	if s.rules != nil {
+		return s.rules()
+	}
+	return defaultAllowanceRules()
+}
+
 func (s *shiftsTab) canvas() fyne.CanvasObject {
-	hint := widget.NewLabel("Kuukausinäkymä. Vuorojen ajat näkyvät solussa, kun vuoroja on lisätty. Päiväklikkaus tulee seuraavassa vaiheessa.")
+	hint := widget.NewLabel("Klikkaa päivää lisätäksesi vuoron. Klikkaa vuoroa muokataksesi. Poista ✕-napilla.")
 	hint.Wrapping = fyne.TextWrapWord
 
 	heading := widget.NewLabel("Vuorokalenteri")
@@ -73,7 +90,14 @@ func (s *shiftsTab) canvas() fyne.CanvasObject {
 	headerRow := container.NewGridWithColumns(7, headers...)
 
 	s.content = container.NewBorder(
-		container.NewVBox(heading, hint, widget.NewSeparator(), nav, headerRow),
+		container.NewVBox(
+			heading,
+			hint,
+			allowanceLegend(),
+			widget.NewSeparator(),
+			nav,
+			headerRow,
+		),
 		nil,
 		nil,
 		nil,
@@ -87,7 +111,6 @@ func (s *shiftsTab) refresh() {
 
 	cells := make([]fyne.CanvasObject, 0, 42)
 	first := time.Date(s.month.Year(), s.month.Month(), 1, 0, 0, 0, 0, s.month.Location())
-	// Monday=0 ... Sunday=6
 	startOffset := (int(first.Weekday()) + 6) % 7
 
 	for i := 0; i < startOffset; i++ {
@@ -116,16 +139,16 @@ func (s *shiftsTab) dayCell(date time.Time, isToday bool) fyne.CanvasObject {
 		dayLabel.Importance = widget.HighImportance
 	}
 
+	allow := summarizeDay(date, s.shifts, s.currentRules())
 	items := []fyne.CanvasObject{dayLabel}
-	for _, sh := range s.shiftsOn(date) {
-		t := widget.NewLabel(sh.Start + "–" + sh.End)
-		t.TextStyle = fyne.TextStyle{Italic: true}
-		items = append(items, t)
+	if chips := allow.chips(); len(chips) > 0 {
+		items = append(items, chipRow(chips))
 	}
-	if len(items) == 1 {
-		// Keep cell height more even when empty of shifts.
-		items = append(items, widget.NewLabel(""))
+	for _, seg := range s.segmentsOn(date) {
+		items = append(items, s.shiftRow(seg))
 	}
+	// Pad empty area so the cell stays tall and easy to hit.
+	items = append(items, layout.NewSpacer())
 
 	inner := container.NewVBox(items...)
 	bg := canvas.NewRectangle(theme.Color(theme.ColorNameInputBackground))
@@ -135,13 +158,190 @@ func (s *shiftsTab) dayCell(date time.Time, isToday bool) fyne.CanvasObject {
 		bg.StrokeWidth = 1.5
 	}
 
-	return container.NewStack(bg, container.NewPadded(inner))
+	d := date
+	cell := container.NewStack(bg, container.NewPadded(inner))
+	return newTapBox(cell, func() {
+		s.openAddShiftDialog(d)
+	}).withMinSize(0, 96)
+}
+
+func (s *shiftsTab) shiftRow(seg shiftSegment) fyne.CanvasObject {
+	label := widget.NewLabel(seg.Label)
+	label.TextStyle = fyne.TextStyle{Italic: true}
+
+	target := seg.Shift
+	edit := newTapBox(label, func() {
+		s.openEditShiftDialog(target)
+	})
+
+	del := widget.NewButton("✕", func() {
+		s.confirmDeleteShift(target)
+	})
+	del.Importance = widget.LowImportance
+
+	return container.NewBorder(nil, nil, nil, del, edit)
 }
 
 func (s *shiftsTab) emptyCell() fyne.CanvasObject {
 	bg := canvas.NewRectangle(theme.Color(theme.ColorNameBackground))
 	bg.CornerRadius = 4
 	return container.NewStack(bg, container.NewPadded(widget.NewLabel("")))
+}
+
+func (s *shiftsTab) openAddShiftDialog(date time.Time) {
+	s.openShiftDialog(date, nil)
+}
+
+func (s *shiftsTab) openEditShiftDialog(existing calendarShift) {
+	s.openShiftDialog(existing.Date, &existing)
+}
+
+func (s *shiftsTab) openShiftDialog(date time.Time, existing *calendarShift) {
+	if s.window == nil {
+		return
+	}
+
+	startVal, endVal := "06:00", "14:00"
+	calloutChecked := false
+	editing := existing != nil
+	if editing {
+		startVal = existing.Start
+		endVal = existing.End
+		calloutChecked = existing.Callout
+		date = existing.Date
+	}
+
+	startPicker := newTimePicker(startVal)
+	endPicker := newTimePicker(endVal)
+	callout := widget.NewCheck("Hälytysvuoro", nil)
+	callout.SetChecked(calloutChecked)
+	formErr := widget.NewLabel("")
+	formErr.Importance = widget.DangerImportance
+	formErr.Hide()
+
+	dateLabel := widget.NewLabel(fmt.Sprintf("Päivä: %s", date.Format("02.01.2006")))
+	dateLabel.TextStyle = fyne.TextStyle{Bold: true}
+
+	form := widget.NewForm(
+		widget.NewFormItem("Alkaa", startPicker.canvas()),
+		widget.NewFormItem("Loppuu", endPicker.canvas()),
+		widget.NewFormItem("", callout),
+	)
+
+	title, confirm := "Lisää vuoro", "Lisää"
+	if editing {
+		title, confirm = "Muokkaa vuoroa", "Tallenna"
+	}
+
+	body := container.NewVBox(dateLabel, form, formErr)
+	var d dialog.Dialog
+	d = dialog.NewCustomConfirm(
+		title,
+		confirm,
+		"Peruuta",
+		body,
+		func(ok bool) {
+			if !ok {
+				return
+			}
+			startPicker.refreshError()
+			endPicker.refreshError()
+			if !startPicker.valid() || !endPicker.valid() {
+				d.Show()
+				return
+			}
+			sh := calendarShift{
+				Date:    date,
+				Start:   startPicker.value(),
+				End:     endPicker.value(),
+				Callout: callout.Checked,
+			}
+			var err error
+			if editing {
+				sh.ID = existing.ID
+				err = s.updateShift(sh)
+			} else {
+				err = s.addShift(sh)
+			}
+			if err != nil {
+				formErr.SetText(err.Error())
+				formErr.Show()
+				d.Show()
+				return
+			}
+		},
+		s.window,
+	)
+	d.Resize(fyne.NewSize(380, 340))
+	d.Show()
+}
+
+func (s *shiftsTab) confirmDeleteShift(sh calendarShift) {
+	if s.window == nil {
+		s.removeShift(sh.ID)
+		return
+	}
+	msg := fmt.Sprintf("Oletko varma, että haluat poistaa vuoron %s–%s?", sh.Start, sh.End)
+	if sh.Callout {
+		msg = fmt.Sprintf("Oletko varma, että haluat poistaa hälytysvuoron %s–%s?", sh.Start, sh.End)
+	}
+	dialog.ShowConfirm("Poista vuoro", msg, func(ok bool) {
+		if ok {
+			s.removeShift(sh.ID)
+		}
+	}, s.window)
+}
+
+func (s *shiftsTab) addShift(sh calendarShift) error {
+	if err := s.validateShift(sh); err != nil {
+		return err
+	}
+	sh.ID = s.nextID
+	s.nextID++
+	s.shifts = append(s.shifts, sh)
+	s.refresh()
+	return nil
+}
+
+func (s *shiftsTab) updateShift(sh calendarShift) error {
+	if sh.ID == 0 {
+		return fmt.Errorf("vuoroa ei löydy")
+	}
+	if err := s.validateShift(sh); err != nil {
+		return err
+	}
+	for i := range s.shifts {
+		if s.shifts[i].ID == sh.ID {
+			s.shifts[i] = sh
+			s.refresh()
+			return nil
+		}
+	}
+	return fmt.Errorf("vuoroa ei löydy")
+}
+
+func (s *shiftsTab) validateShift(sh calendarShift) error {
+	if sh.Start == sh.End {
+		return fmt.Errorf("alku ja loppu eivät voi olla sama aika")
+	}
+	if _, _, err := sh.absoluteRange(); err != nil {
+		return fmt.Errorf("virheellinen vuoroaika")
+	}
+	if s.overlapsExisting(sh) {
+		return fmt.Errorf("vuoro menee päällekkäin toisen vuoron kanssa")
+	}
+	return nil
+}
+
+func (s *shiftsTab) removeShift(id int) {
+	out := s.shifts[:0]
+	for _, sh := range s.shifts {
+		if sh.ID != id {
+			out = append(out, sh)
+		}
+	}
+	s.shifts = out
+	s.refresh()
 }
 
 func (s *shiftsTab) shiftsOn(date time.Time) []calendarShift {

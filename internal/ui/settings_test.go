@@ -25,6 +25,13 @@ func TestSettingsDefaults(t *testing.T) {
 	if s.nightStart.value() != "22:00" || s.nightEnd.value() != "06:00" {
 		t.Fatalf("night=%s–%s", s.nightStart.value(), s.nightEnd.value())
 	}
+	if s.overtime50After.Text != "8" || s.overtime100After.Text != "10" {
+		t.Fatalf("overtime thresholds=%q/%q", s.overtime50After.Text, s.overtime100After.Text)
+	}
+	rules := s.allowanceRules()
+	if rules.overtime50AfterH != 8 || rules.overtime100AfterH != 10 {
+		t.Fatalf("rules OT=%v/%v", rules.overtime50AfterH, rules.overtime100AfterH)
+	}
 }
 
 func TestSettingsPayFieldsEditable(t *testing.T) {
