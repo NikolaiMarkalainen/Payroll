@@ -30,14 +30,15 @@ type calendarShift struct {
 }
 
 type shiftsTab struct {
-	window  fyne.Window
-	month   time.Time
-	shifts  []calendarShift
-	nextID  int
-	title   *widget.Label
-	grid    *fyne.Container
-	content fyne.CanvasObject
-	rules   func() allowanceRules
+	window       fyne.Window
+	month        time.Time
+	shifts       []calendarShift
+	nextID       int
+	title        *widget.Label
+	grid         *fyne.Container
+	content      fyne.CanvasObject
+	rules        func() allowanceRules
+	onDemoLoaded func()
 }
 
 func newShiftsTab(w fyne.Window) *shiftsTab {
@@ -54,6 +55,29 @@ func newShiftsTab(w fyne.Window) *shiftsTab {
 	s.grid = container.NewGridWithColumns(7)
 	s.refresh()
 	return s
+}
+
+func (s *shiftsTab) loadDemoSeed() {
+	loc := time.Local
+	if s.month.Location() != nil {
+		loc = s.month.Location()
+	}
+	s.replaceShifts(demoRosterShifts(loc), demoFocusMonth(loc))
+	if s.onDemoLoaded != nil {
+		s.onDemoLoaded()
+	}
+}
+
+func (s *shiftsTab) replaceShifts(shifts []calendarShift, month time.Time) {
+	s.shifts = make([]calendarShift, 0, len(shifts))
+	s.nextID = 1
+	for _, sh := range shifts {
+		sh.ID = s.nextID
+		s.nextID++
+		s.shifts = append(s.shifts, sh)
+	}
+	s.month = time.Date(month.Year(), month.Month(), 1, 0, 0, 0, 0, month.Location())
+	s.refresh()
 }
 
 func (s *shiftsTab) currentRules() allowanceRules {

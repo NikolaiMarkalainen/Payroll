@@ -11,7 +11,7 @@ func TestBuildUIHasExpectedTabs(t *testing.T) {
 	w := test.NewWindow(nil)
 	defer w.Close()
 
-	content, tabs := buildUI(w)
+	content, tabs, _ := buildUI(w)
 	w.SetContent(content)
 
 	want := []string{"Asetukset", "Vuorot", "PDF-tuonti", "Laskelma", "Vertailu"}

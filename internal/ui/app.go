@@ -9,13 +9,27 @@ import (
 
 const appID = "com.nikolaimarkalainen.payroll"
 
+// Options configures app startup.
+type Options struct {
+	Demo bool // load sample roster and open Vuorot
+}
+
 func Run() {
+	RunWith(Options{})
+}
+
+func RunWith(opts Options) {
 	a := app.NewWithID(appID)
 	w := a.NewWindow("Palkkatarkistus")
 	w.Resize(fyne.NewSize(1100, 720))
 	w.SetMaster()
 
-	content, tabs := buildUI(w)
+	content, tabs, shifts := buildUI(w)
+	if opts.Demo {
+		shifts.loadDemoSeed()
+		tabs.SelectIndex(1)
+		w.SetTitle("Palkkatarkistus (demo)")
+	}
 	w.SetContent(content)
 
 	w.SetMainMenu(fyne.NewMainMenu(
@@ -35,20 +49,27 @@ func Run() {
 }
 
 // buildUI constructs the main layout and returns it with the tab bar for tests.
-func buildUI(w fyne.Window) (fyne.CanvasObject, *container.AppTabs) {
+func buildUI(w fyne.Window) (fyne.CanvasObject, *container.AppTabs, *shiftsTab) {
 	settings := newSettingsTab()
 	shifts := newShiftsTab(w)
 	shifts.rules = settings.allowanceRules
 	settings.onSaved = func() { shifts.refresh() }
+	calcView := newCalcTab(settings, shifts)
 
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Asetukset", settings.canvas()),
 		container.NewTabItem("Vuorot", shifts.canvas()),
 		container.NewTabItem("PDF-tuonti", emptyTab("PDF-tuonti")),
-		container.NewTabItem("Laskelma", emptyTab("Laskelma")),
+		container.NewTabItem("Laskelma", calcView.canvas()),
 		container.NewTabItem("Vertailu", emptyTab("Vertailu")),
 	)
 	tabs.SetTabLocation(container.TabLocationTop)
+
+	// Expose calc tab for demo range via shifts pointer side-channel.
+	shifts.onDemoLoaded = func() {
+		settings.applyDemoTES()
+		calcView.setDemoRange()
+	}
 
 	header := widget.NewLabel("Palkkatarkistus")
 	header.TextStyle = fyne.TextStyle{Bold: true}
@@ -62,7 +83,7 @@ func buildUI(w fyne.Window) (fyne.CanvasObject, *container.AppTabs) {
 		nil,
 		tabs,
 	)
-	return content, tabs
+	return content, tabs, shifts
 }
 
 func emptyTab(name string) fyne.CanvasObject {

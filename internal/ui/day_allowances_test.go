@@ -84,16 +84,27 @@ func TestSummarizeDayCalloutAndOvertime(t *testing.T) {
 		Date: day, Start: "06:00", End: "16:00", Callout: true,
 	}}
 	got := summarizeDay(day, shifts, rules)
-	// 10h total → 2h at 50% (8–10), 0h at 100%
-	if got.Total != 10 || got.Callout != 10 || got.Overtime50 != 2 || got.Overtime100 != 0 {
+	// 10h total → under 12h shift OT threshold
+	if got.Total != 10 || got.Callout != 10 || got.Overtime50 != 0 || got.Overtime100 != 0 {
 		t.Fatalf("got=%+v", got)
 	}
-	codes := map[string]float64{}
-	for _, c := range got.chips() {
-		codes[c.Code] = c.Hours
+
+	shifts = []calendarShift{{
+		Date: day, Start: "06:00", End: "18:00", Callout: true,
+	}}
+	got = summarizeDay(day, shifts, rules)
+	// exactly 12h → no extension OT
+	if got.Total != 12 || got.Overtime50 != 0 || got.Overtime100 != 0 {
+		t.Fatalf("12h day got=%+v", got)
 	}
-	if codes[codeCallout] != 10 || codes[codeOvertime50] != 2 {
-		t.Fatalf("chips=%v", codes)
+
+	shifts = []calendarShift{{
+		Date: day, Start: "06:00", End: "20:00", Callout: true,
+	}}
+	got = summarizeDay(day, shifts, rules)
+	// 14h → 2h extension @ 50% chip
+	if got.Total != 14 || got.Overtime50 != 2 || got.Overtime100 != 0 {
+		t.Fatalf("14h day got=%+v", got)
 	}
 }
 

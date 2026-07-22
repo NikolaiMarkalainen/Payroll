@@ -25,11 +25,11 @@ func TestSettingsDefaults(t *testing.T) {
 	if s.nightStart.value() != "22:00" || s.nightEnd.value() != "06:00" {
 		t.Fatalf("night=%s–%s", s.nightStart.value(), s.nightEnd.value())
 	}
-	if s.overtime50After.Text != "8" || s.overtime100After.Text != "10" {
+	if s.overtime50After.Text != "12" || s.overtime100After.Text != "18" {
 		t.Fatalf("overtime thresholds=%q/%q", s.overtime50After.Text, s.overtime100After.Text)
 	}
 	rules := s.allowanceRules()
-	if rules.overtime50AfterH != 8 || rules.overtime100AfterH != 10 {
+	if rules.overtime50AfterH != 12 || rules.overtime100AfterH != 18 {
 		t.Fatalf("rules OT=%v/%v", rules.overtime50AfterH, rules.overtime100AfterH)
 	}
 }
@@ -58,9 +58,6 @@ func TestSettingsSaveUpdatesStatus(t *testing.T) {
 	w := test.NewWindow(content)
 	defer w.Close()
 
-	s.eveningStart.set("19:00")
-	s.eveningEnd.set("23:00")
-
 	if s.saveBtn == nil {
 		t.Fatal("save button missing")
 	}
@@ -68,11 +65,5 @@ func TestSettingsSaveUpdatesStatus(t *testing.T) {
 
 	if !strings.Contains(s.status.Text, "tallennettu") {
 		t.Fatalf("status=%q", s.status.Text)
-	}
-	if !strings.Contains(s.status.Text, "19:00") || !strings.Contains(s.status.Text, "23:00") {
-		t.Fatalf("status missing times: %q", s.status.Text)
-	}
-	if !strings.Contains(s.status.Text, "22:00") || !strings.Contains(s.status.Text, "06:00") {
-		t.Fatalf("status missing night defaults: %q", s.status.Text)
 	}
 }

@@ -35,8 +35,8 @@ func defaultAllowanceRules() allowanceRules {
 		eveningEndMin:     22 * 60,
 		nightStartMin:     22 * 60,
 		nightEndMin:       6 * 60,
-		overtime50AfterH:  8,  // TES: often after 8h/day
-		overtime100AfterH: 10, // TES: often first 2 OT hours at 50%, then 100%
+		overtime50AfterH:  12, // TES 31 §: shift over 12 h → like OT 50%
+		overtime100AfterH: 18, // TES: first 18 such hours @50%, rest @100% (period)
 		holidays:          map[string]bool{},
 	}
 }
@@ -171,9 +171,32 @@ func summarizeDay(date time.Time, shifts []calendarShift, rules allowanceRules) 
 		eve, night := splitEveningNight(clipStart, clipEnd, dayStart, rules)
 		out.Evening += eve
 		out.Night += night
+
+		// TES 31 §: hours over overtime50AfterH on the full continuous shift,
+		// attributed to this calendar day where the extension tail falls.
+		if rules.overtime50AfterH > 0 {
+			fullDur := absEnd.Sub(absStart).Hours()
+			if fullDur > rules.overtime50AfterH {
+				extH := fullDur - rules.overtime50AfterH
+				extStart := absEnd.Add(-time.Duration(extH * float64(time.Hour)))
+				extEnd := absEnd
+				if extStart.Before(dayStart) {
+					extStart = dayStart
+				}
+				if extEnd.After(dayEnd) {
+					extEnd = dayEnd
+				}
+				if extStart.Before(extEnd) {
+					// Day chips: show as 50% (period-level 100% split is in Laskelma).
+					out.Overtime50 += extEnd.Sub(extStart).Hours()
+				}
+			}
+		}
 	}
 
-	out.Overtime50, out.Overtime100 = splitOvertime(out.Total, rules.overtime50AfterH, rules.overtime100AfterH)
+	if rules.overtime50AfterH <= 0 {
+		out.Overtime50, out.Overtime100 = splitOvertime(out.Total, rules.overtime50AfterH, rules.overtime100AfterH)
+	}
 
 	out.Total = roundHours(out.Total)
 	out.Callout = roundHours(out.Callout)
