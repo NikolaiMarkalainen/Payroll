@@ -15,27 +15,8 @@ func Run() {
 	w.Resize(fyne.NewSize(960, 640))
 	w.SetMaster()
 
-	tabs := container.NewAppTabs(
-		container.NewTabItem("Asetukset", emptyTab("Asetukset")),
-		container.NewTabItem("Vuorot", emptyTab("Vuorot")),
-		container.NewTabItem("PDF-tuonti", emptyTab("PDF-tuonti")),
-		container.NewTabItem("Laskelma", emptyTab("Laskelma")),
-		container.NewTabItem("Vertailu", emptyTab("Vertailu")),
-	)
-	tabs.SetTabLocation(container.TabLocationTop)
-
-	header := widget.NewLabel("Palkkatarkistus")
-	header.TextStyle = fyne.TextStyle{Bold: true}
-	subtitle := widget.NewLabel("Vertaa TES-pohjaista laskelmaa maksettuun palkkaan.")
-	subtitle.Wrapping = fyne.TextWrapWord
-
-	w.SetContent(container.NewBorder(
-		container.NewVBox(header, subtitle, widget.NewSeparator()),
-		nil,
-		nil,
-		nil,
-		tabs,
-	))
+	content, tabs := buildUI()
+	w.SetContent(content)
 
 	w.SetMainMenu(fyne.NewMainMenu(
 		fyne.NewMenu("Tiedosto",
@@ -51,6 +32,34 @@ func Run() {
 	))
 
 	w.ShowAndRun()
+}
+
+// buildUI constructs the main layout and returns it with the tab bar for tests.
+func buildUI() (fyne.CanvasObject, *container.AppTabs) {
+	settings := newSettingsTab()
+
+	tabs := container.NewAppTabs(
+		container.NewTabItem("Asetukset", settings.canvas()),
+		container.NewTabItem("Vuorot", emptyTab("Vuorot")),
+		container.NewTabItem("PDF-tuonti", emptyTab("PDF-tuonti")),
+		container.NewTabItem("Laskelma", emptyTab("Laskelma")),
+		container.NewTabItem("Vertailu", emptyTab("Vertailu")),
+	)
+	tabs.SetTabLocation(container.TabLocationTop)
+
+	header := widget.NewLabel("Palkkatarkistus")
+	header.TextStyle = fyne.TextStyle{Bold: true}
+	subtitle := widget.NewLabel("Vertaa TES-pohjaista laskelmaa maksettuun palkkaan.")
+	subtitle.Wrapping = fyne.TextWrapWord
+
+	content := container.NewBorder(
+		container.NewVBox(header, subtitle, widget.NewSeparator()),
+		nil,
+		nil,
+		nil,
+		tabs,
+	)
+	return content, tabs
 }
 
 func emptyTab(name string) fyne.CanvasObject {
