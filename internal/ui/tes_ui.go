@@ -161,6 +161,9 @@ func (s *settingsTab) applyCustomBarebones() {
 	if s.holidayAllowance != nil {
 		s.holidayAllowance.SetText("0.00")
 	}
+	if s.perehdytysAllowance != nil {
+		s.perehdytysAllowance.SetText("0.00")
+	}
 	if s.experienceAllowance != nil {
 		s.experienceAllowance.SetText("0.00")
 	}

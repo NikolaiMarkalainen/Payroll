@@ -57,8 +57,11 @@ func TestCalcTabRunsForDemoRange(t *testing.T) {
 			t.Fatalf("summary missing money: %q", c.summary.Text)
 		}
 	}
-	if !strings.Contains(c.details.Text, "Pohja:") {
-		t.Fatalf("details=%q", c.details.Text)
+	if !strings.Contains(c.details.Text, "Pohja") || !strings.Contains(c.details.Text, "e/h") {
+		t.Fatalf("details missing table headers/rows: %q", c.details.Text)
+	}
+	if !strings.Contains(c.details.Text, "Lauantailisä") {
+		t.Fatalf("details missing Lauantailisä: %q", c.details.Text)
 	}
 }
 

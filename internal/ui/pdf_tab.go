@@ -428,7 +428,7 @@ func (p *pdfTab) applyImport() {
 	if len(out) > 0 {
 		focus = out[0].Date
 	}
-	p.shifts.replaceShifts(out, focus)
+	kept, replacedDays, added := p.shifts.mergeImportedShifts(out, focus)
 	if p.calc != nil {
 		if _, ok := p.calc.anchorDate(); !ok && !focus.IsZero() {
 			// First import: use first shift day as 1. jakson ankkuri if unset.
@@ -442,5 +442,13 @@ func (p *pdfTab) applyImport() {
 			p.calc.setRange(p.result.From, p.result.To)
 		}
 	}
-	p.status.SetText(fmt.Sprintf("Tuotu %d vuoroa kalenteriin. Katso Vuorot-välilehti.", len(out)))
+	total := len(p.shifts.shifts)
+	if kept == 0 {
+		p.status.SetText(fmt.Sprintf("Tuotu %d vuoroa kalenteriin. Katso Vuorot-välilehti.", added))
+		return
+	}
+	p.status.SetText(fmt.Sprintf(
+		"Tuotu %d vuoroa (%d pv päivitetty). Edelliset %d vuoroa säilyivät. Kalenterissa yhteensä %d. Katso Vuorot-välilehti.",
+		added, replacedDays, kept, total,
+	))
 }

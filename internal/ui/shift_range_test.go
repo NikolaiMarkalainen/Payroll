@@ -20,6 +20,14 @@ func TestShiftTitleLine(t *testing.T) {
 	if got := shiftTitleLine(calendarShift{Callout: true}); got != "H" {
 		t.Fatalf("callout=%q", got)
 	}
+	if got := shiftTitleLine(calendarShift{PerehdytysStart: "06:00", PerehdytysEnd: "07:00"}); got != "PERE" {
+		t.Fatalf("pere=%q", got)
+	}
+	if got := shiftTitleLine(calendarShift{
+		Callout: true, Code: "3AAA", PerehdytysStart: "06:00", PerehdytysEnd: "07:30",
+	}); got != "H PERE *3AAA" {
+		t.Fatalf("combo=%q", got)
+	}
 }
 
 func TestOvernightSegmentsSplitAcrossDays(t *testing.T) {

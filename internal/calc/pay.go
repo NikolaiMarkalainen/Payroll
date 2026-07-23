@@ -84,6 +84,7 @@ func Calculate(in PeriodInput) Breakdown {
 	if rules.CalloutFixedH > 0 {
 		addCalloutFixed(byDay, in.Shifts, periodStart, periodEnd, rules.CalloutFixedH, holidays)
 	}
+	addPerehdytysHours(byDay, in.Shifts, periodStart, periodEnd, holidays)
 
 	var out Breakdown
 	for d := fromDay; !d.After(toDay); d = d.AddDate(0, 0, 1) {
@@ -105,6 +106,7 @@ func Calculate(in PeriodInput) Breakdown {
 		out.SundayHours += dh.Sunday
 		out.HolidayHours += dh.Holiday
 		out.CalloutHours += dh.Callout
+		out.PerehdytysHours += dh.Perehdytys
 		out.Overtime50Hours += dh.Overtime50
 		out.Overtime100Hours += dh.Overtime100
 	}
@@ -183,6 +185,39 @@ func addCalloutFixed(byDay map[string]*DayHours, shifts []Shift, periodStart, pe
 	}
 }
 
+// addPerehdytysHours credits Shift.PerehdytysHours on the shift start day (like callout).
+func addPerehdytysHours(byDay map[string]*DayHours, shifts []Shift, periodStart, periodEnd time.Time, holidays map[string]string) {
+	for _, sh := range shifts {
+		if sh.PerehdytysHours <= 0 || !sh.Start.Before(sh.End) {
+			continue
+		}
+		start, end := sh.Start, sh.End
+		if start.Before(periodStart) {
+			start = periodStart
+		}
+		if end.After(periodEnd) {
+			end = periodEnd
+		}
+		if !start.Before(end) {
+			continue
+		}
+		day := truncateDay(sh.Start)
+		if day.Before(truncateDay(periodStart)) || !day.Before(periodEnd) {
+			day = truncateDay(start)
+		}
+		key := Key(day)
+		dh := byDay[key]
+		if dh == nil {
+			dh = &DayHours{Date: day}
+			if name, ok := holidays[key]; ok {
+				dh.HolidayName = name
+			}
+			byDay[key] = dh
+		}
+		dh.Perehdytys += sh.PerehdytysHours
+	}
+}
+
 func applyMoney(out *Breakdown, r Rates) {
 	eff := r.EffectiveHourly()
 	eveDoubleRate := r.EveningDouble
@@ -197,6 +232,7 @@ func applyMoney(out *Breakdown, r Rates) {
 	out.ExperiencePay = out.BaseHours * r.Experience
 	out.PersonalPay = out.BaseHours * r.Personal
 	out.TrainingPay = out.BaseHours * r.Training
+	out.PerehdytysPay = out.PerehdytysHours * r.Perehdytys
 	out.OtherPay = out.BaseHours*r.OtherHourly + r.OtherFixed
 	out.EveningPay = normalEve*r.Evening + out.EveningDoubleHours*eveDoubleRate
 	out.NightPay = out.NightHours * r.Night
@@ -209,7 +245,7 @@ func applyMoney(out *Breakdown, r Rates) {
 	out.PeriodOT100Pay = out.PeriodOT100Hours * eff * 1.0
 	out.CalloutPay = out.CalloutHours * eff
 	out.TotalPay = roundMoney(
-		out.BasePay + out.ExperiencePay + out.PersonalPay + out.TrainingPay + out.OtherPay +
+		out.BasePay + out.ExperiencePay + out.PersonalPay + out.TrainingPay + out.PerehdytysPay + out.OtherPay +
 			out.EveningPay + out.NightPay + out.SaturdayPay +
 			out.SundayPay + out.HolidayPay + out.Overtime50Pay + out.Overtime100Pay +
 			out.PeriodOT50Pay + out.PeriodOT100Pay + out.CalloutPay,
@@ -223,6 +259,7 @@ func applyMoney(out *Breakdown, r Rates) {
 	out.SundayHours = roundHours(out.SundayHours)
 	out.HolidayHours = roundHours(out.HolidayHours)
 	out.CalloutHours = roundHours(out.CalloutHours)
+	out.PerehdytysHours = roundHours(out.PerehdytysHours)
 	out.Overtime50Hours = roundHours(out.Overtime50Hours)
 	out.Overtime100Hours = roundHours(out.Overtime100Hours)
 	out.WeeklyOT50Hours = roundHours(out.WeeklyOT50Hours)
@@ -231,6 +268,7 @@ func applyMoney(out *Breakdown, r Rates) {
 	out.ExperiencePay = roundMoney(out.ExperiencePay)
 	out.PersonalPay = roundMoney(out.PersonalPay)
 	out.TrainingPay = roundMoney(out.TrainingPay)
+	out.PerehdytysPay = roundMoney(out.PerehdytysPay)
 	out.OtherPay = roundMoney(out.OtherPay)
 	out.EveningPay = roundMoney(out.EveningPay)
 	out.NightPay = roundMoney(out.NightPay)

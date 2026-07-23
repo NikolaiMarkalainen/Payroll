@@ -126,6 +126,9 @@ func (s *settingsTab) applyKaupanPay(group string, pks bool, service string) {
 	// Su/pyhä = 100 % taulukon tuntipalkasta (perus + kokemus).
 	s.sundayAllowance.SetText(fmt.Sprintf("%.2f", sel.Hourly))
 	s.holidayAllowance.SetText(fmt.Sprintf("%.2f", sel.Hourly))
+	if s.perehdytysAllowance != nil {
+		s.perehdytysAllowance.SetText("0.00")
+	}
 	s.dailyRestHours.SetText("11")
 	s.restViolationPercent.SetText("50")
 	s.overtime50After.SetText(fmt.Sprintf("%.0f", rules.Overtime50AfterH))

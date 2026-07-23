@@ -9,6 +9,7 @@ import (
 // Allowance indicator codes shown in calendar cells.
 const (
 	codeCallout = "H" // Hälytys
+	codePerehdytys = "PERE"
 	codeSunday = "S" // Sunnuntailisä
 	codeHoliday = "P" // Pyhälisä
 	codeEvening = "I" // Iltalisä
@@ -70,6 +71,7 @@ func (r allowanceRules) withYearHolidays(year int) allowanceRules {
 type dayAllowances struct {
 	Total float64
 	Callout float64
+	Perehdytys float64
 	Sunday float64
 	Holiday float64
 	Evening float64
@@ -91,6 +93,7 @@ func (d dayAllowances) chips() []allowanceChip {
 	}
 	order := []item{
 		{codeCallout, d.Callout},
+		{codePerehdytys, d.Perehdytys},
 		{codeSunday, d.Sunday},
 		{codeHoliday, d.Holiday},
 		{codeEvening, d.Evening},
@@ -169,6 +172,12 @@ func summarizeDay(date time.Time, shifts []calendarShift, rules allowanceRules) 
 				}
 			}
 		}
+		if sh.hasPerehdytys() {
+			absDay := time.Date(absStart.Year(), absStart.Month(), absStart.Day(), 0, 0, 0, 0, absStart.Location())
+			if absDay.Equal(dayStart) {
+				out.Perehdytys += sh.perehdytysHours()
+			}
+		}
 		if isSun {
 			out.Sunday += hours
 		}
@@ -217,6 +226,7 @@ func summarizeDay(date time.Time, shifts []calendarShift, rules allowanceRules) 
 
 	out.Total = roundHours(out.Total)
 	out.Callout = roundHours(out.Callout)
+	out.Perehdytys = roundHours(out.Perehdytys)
 	out.Sunday = roundHours(out.Sunday)
 	out.Holiday = roundHours(out.Holiday)
 	out.Evening = roundHours(out.Evening)

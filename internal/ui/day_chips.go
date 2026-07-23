@@ -14,6 +14,8 @@ func chipColor(code string) color.NRGBA {
 	switch code {
 	case codeCallout:
 		return color.NRGBA{R: 0xc4, G: 0x5c, B: 0x26, A: 0xff} // burnt orange
+	case codePerehdytys:
+		return color.NRGBA{R: 0x3d, G: 0x7a, B: 0x4a, A: 0xff} // forest green
 	case codeSunday:
 		return color.NRGBA{R: 0xb3, G: 0x2d, B: 0x3a, A: 0xff} // crimson
 	case codeHoliday:
@@ -39,6 +41,7 @@ func allowanceLegend() fyne.CanvasObject {
 		name string
 	}{
 		{codeCallout, "hälyt"},
+		{codePerehdytys, "pere"},
 		{codeSunday, "su"},
 		{codeHoliday, "pyhä"},
 		{codeEvening, "ilta"},

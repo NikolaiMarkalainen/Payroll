@@ -38,6 +38,7 @@ type settingsTab struct {
 	saturdayAllowance *widget.Entry
 	sundayAllowance *widget.Entry
 	holidayAllowance *widget.Entry
+	perehdytysAllowance *widget.Entry
 	dailyRestHours *widget.Entry
 	restViolationPercent *widget.Entry
 	overtime50After *widget.Entry
@@ -100,6 +101,7 @@ func newSettingsTab() *settingsTab {
 		saturdayAllowance: widget.NewEntry(),
 		sundayAllowance: widget.NewEntry(),
 		holidayAllowance: widget.NewEntry(),
+		perehdytysAllowance: widget.NewEntry(),
 		dailyRestHours: widget.NewEntry(),
 		restViolationPercent: widget.NewEntry(),
 		overtime50After: widget.NewEntry(),
@@ -166,6 +168,7 @@ func newSettingsTab() *settingsTab {
 	s.saturdayAllowance.SetPlaceHolder("0.00")
 	s.sundayAllowance.SetPlaceHolder("0.00")
 	s.holidayAllowance.SetPlaceHolder("0.00")
+	s.perehdytysAllowance.SetPlaceHolder("0.00")
 	s.experienceAllowance.SetText("0.00")
 	s.personalAllowance.SetText("0.00")
 	s.trainingAllowance.SetText("0.00")
@@ -173,6 +176,7 @@ func newSettingsTab() *settingsTab {
 	s.otherMode.SetSelected(otherModeNone)
 	s.otherAllowance.SetText("0.00")
 	s.eveningDoubleAllowance.SetText("0.00")
+	s.perehdytysAllowance.SetText("0.00")
 	s.dailyRestHours.SetText("10")
 	s.restViolationPercent.SetText("50")
 	s.overtime50After.SetText("12")
@@ -228,6 +232,7 @@ func (s *settingsTab) canvas() fyne.CanvasObject {
 		widget.NewFormItem("Lauantailisä (e/h)", s.saturdayAllowance),
 		widget.NewFormItem("Sunnuntailisä (e/h)", s.sundayAllowance),
 		widget.NewFormItem("Pyhälisä (e/h)", s.holidayAllowance),
+		widget.NewFormItem("Perehdytyslisä (e/h)", s.perehdytysAllowance),
 	)
 
 	s.expHint = widget.NewLabel("")

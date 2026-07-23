@@ -48,6 +48,7 @@ const (
 	vartioSaturday = 2.18
 	vartioTrainingHourly = 0.25 // TES 25
 	vartioTrainingMonthly = 40.0
+	vartioPerehdytysHourly = 1.00 // palkkalaji 20701
 )
 
 func vartioServiceIndex(name string) int {
@@ -120,6 +121,9 @@ func (s *settingsTab) applyVartiointiPay(level string, pks bool, service string)
 	s.saturdayAllowance.SetText(fmt.Sprintf("%.2f", vartioSaturday))
 	s.sundayAllowance.SetText(fmt.Sprintf("%.2f", sel.Hourly))
 	s.holidayAllowance.SetText(fmt.Sprintf("%.2f", sel.Hourly))
+	if s.perehdytysAllowance != nil {
+		s.perehdytysAllowance.SetText(fmt.Sprintf("%.2f", vartioPerehdytysHourly))
+	}
 	s.dailyRestHours.SetText("10")
 	s.restViolationPercent.SetText("50")
 	s.overtime50After.SetText("12")

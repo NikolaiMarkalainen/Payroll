@@ -34,6 +34,9 @@ func TestVartiointiRatesBridgeToCalculate(t *testing.T) {
 	if math.Abs(r.Training-0.25) > 0.001 {
 		t.Fatalf("koulutus=%v", r.Training)
 	}
+	if math.Abs(r.Perehdytys-1.00) > 0.001 {
+		t.Fatalf("perehdytys=%v", r.Perehdytys)
+	}
 
 	day := time.Date(2026, 7, 15, 0, 0, 0, 0, time.UTC)
 	got := calc.Calculate(calc.PeriodInput{
@@ -148,7 +151,7 @@ func TestCalcTabDemoTESEndToEnd(t *testing.T) {
 	if !strings.Contains(c.summary.Text, "Palkka yhteensä") {
 		t.Fatalf("summary=%q", c.summary.Text)
 	}
-	for _, needle := range []string{"Iltalisä", "Yölisä", "Lauantai", "Pidennysylityö"} {
+	for _, needle := range []string{"Iltatyölisä", "Yötyölisä", "Lauantailisä", "Pidennysylityö"} {
 		if !strings.Contains(c.details.Text, needle) {
 			t.Fatalf("details missing %q: %q", needle, c.details.Text)
 		}

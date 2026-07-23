@@ -52,7 +52,8 @@ func newCalcTab(settings *settingsTab, shifts *shiftsTab) *calcTab {
 	c.err.Importance = widget.DangerImportance
 	c.err.Hide()
 	c.summary.Wrapping = fyne.TextWrapWord
-	c.details.Wrapping = fyne.TextWrapWord
+	c.details.Wrapping = fyne.TextWrapOff
+	c.details.TextStyle = fyne.TextStyle{Monospace: true}
 	c.from.SetPlaceHolder("PP.KK.VVVV")
 	c.to.SetPlaceHolder("PP.KK.VVVV")
 	c.absence.SetPlaceHolder("0.00")
@@ -398,7 +399,7 @@ func (c *calcTab) run() {
 	}
 	out := calc.Calculate(in)
 	c.summary.SetText(formatCalcSummary(from, to, out, rules))
-	c.details.SetText(formatCalcDetails(out, rules))
+	c.details.SetText(formatCalcDetails(out, rules, in.Rates))
 }
 
 func formatCalcSummary(from, to time.Time, out calc.Breakdown, rules calc.Rules) string {
@@ -420,67 +421,118 @@ func formatCalcSummary(from, to time.Time, out calc.Breakdown, rules calc.Rules)
 	return s
 }
 
-func formatCalcDetails(out calc.Breakdown, rules calc.Rules) string {
-	var b strings.Builder
+func formatCalcDetails(out calc.Breakdown, rules calc.Rules, rates calc.Rates) string {
+	eff := rates.EffectiveHourly()
+	eveDoubleRate := rates.EveningDouble
+	if eveDoubleRate == 0 && out.EveningDoubleHours > 0 {
+		eveDoubleRate = 2 * rates.Evening
+	}
+	normalEveH := out.EveningHours - out.EveningDoubleHours
+	if normalEveH < 0 {
+		normalEveH = 0
+	}
+	normalEvePay := normalEveH * rates.Evening
+	eveDoublePay := out.EveningDoubleHours * eveDoubleRate
+
 	ot50Label := "Ylityö 50 %"
 	ot100Label := "Ylityö 100 %"
 	if rules.ShiftOTAfterH > 0 {
 		ot50Label = "Pidennysylityö 50 % (TES 31)"
-		ot100Label = "Pidennysylityö 100 % (yli 18 h jaksossa)"
+		ot100Label = "Pidennysylityö 100 % (yli 18 h)"
 	}
-	b.WriteString(fmt.Sprintf(
-		"Pohja: %.2f h / %.2f e\n"+
-			"Kokemuslisä: %.2f h / %.2f e\n"+
-			"Henkilökohtainen: %.2f h / %.2f e\n"+
-			"Koulutuslisä: %.2f h / %.2f e\n"+
-			"Muu lisä: %.2f e\n"+
-			"Iltalisä: %.2f h / %.2f e\n"+
-			"Iltalisä 2x: %.2f h\n"+
-			"Yölisä: %.2f h / %.2f e\n"+
-			"Lauantai: %.2f h / %.2f e\n"+
-			"Sunnuntai: %.2f h / %.2f e\n"+
-			"Pyhä: %.2f h / %.2f e\n"+
-			"%s: %.2f h / %.2f e\n"+
-			"%s: %.2f h / %.2f e\n",
-		out.BaseHours, out.BasePay,
-		out.BaseHours, out.ExperiencePay,
-		out.BaseHours, out.PersonalPay,
-		out.BaseHours, out.TrainingPay,
-		out.OtherPay,
-		out.EveningHours, out.EveningPay,
-		out.EveningDoubleHours,
-		out.NightHours, out.NightPay,
-		out.SaturdayHours, out.SaturdayPay,
-		out.SundayHours, out.SundayPay,
-		out.HolidayHours, out.HolidayPay,
-		ot50Label, out.Overtime50Hours, out.Overtime50Pay,
-		ot100Label, out.Overtime100Hours, out.Overtime100Pay,
-	))
+
+	type row struct {
+		name  string
+		hours float64
+		rate  float64
+		sum   float64
+		hasH  bool // show hours+rate columns
+	}
+	rows := []row{
+		{"Pohja", out.BaseHours, rates.Hourly, out.BasePay, true},
+		{"Kokemuslisä", out.BaseHours, rates.Experience, out.ExperiencePay, true},
+		{"Henkilökohtainen", out.BaseHours, rates.Personal, out.PersonalPay, true},
+		{"Koulutuslisä", out.BaseHours, rates.Training, out.TrainingPay, true},
+	}
+	if rates.OtherHourly > 0 || out.OtherPay != 0 {
+		if rates.OtherHourly > 0 {
+			rows = append(rows, row{"Muu lisä (e/h)", out.BaseHours, rates.OtherHourly, out.BaseHours * rates.OtherHourly, true})
+		}
+		if rates.OtherFixed > 0 {
+			rows = append(rows, row{"Muu lisä (kiinteä)", 0, 0, rates.OtherFixed, false})
+		}
+	} else {
+		rows = append(rows, row{"Muu lisä", 0, 0, out.OtherPay, false})
+	}
+	rows = append(rows, row{"Iltatyölisä", normalEveH, rates.Evening, normalEvePay, true})
+	// Iltalisä 2x is Kaupan (marras–joulu su), not used in Vartiointi.
+	if eveningDoubleEnabled(rules) {
+		rows = append(rows, row{"Iltatyölisä 2x", out.EveningDoubleHours, eveDoubleRate, eveDoublePay, true})
+	}
+	rows = append(rows,
+		row{"Yötyölisä", out.NightHours, rates.Night, out.NightPay, true},
+		row{"Lauantailisä", out.SaturdayHours, rates.Saturday, out.SaturdayPay, true},
+		row{"Sunnuntaikorotus 100%", out.SundayHours, rates.Sunday, out.SundayPay, true},
+		row{"Pyhäkorotus", out.HolidayHours, rates.Holiday, out.HolidayPay, true},
+		row{"Perehdytyslisä", out.PerehdytysHours, rates.Perehdytys, out.PerehdytysPay, true},
+		row{ot50Label, out.Overtime50Hours, eff * 0.5, out.Overtime50Pay, true},
+		row{ot100Label, out.Overtime100Hours, eff, out.Overtime100Pay, true},
+	)
 	if rules.WeeklyOTEnabled && out.WeeklyOT50Hours > 0 {
-		b.WriteString(fmt.Sprintf("Viikkoylitys 50 %%: %.2f h (sis. yllä olevaan 50 %%:iin)\n", out.WeeklyOT50Hours))
+		rows = append(rows, row{"Viikkoylitys 50 % (sis. ylityöhön)", out.WeeklyOT50Hours, eff * 0.5, out.WeeklyOT50Hours * eff * 0.5, true})
 	}
 	if rules.PeriodOTEnabled {
+		rows = append(rows,
+			row{"Jaksoylityö 50 %", out.PeriodOT50Hours, eff * 0.5, out.PeriodOT50Pay, true},
+			row{"Jaksoylityö 100 %", out.PeriodOT100Hours, eff, out.PeriodOT100Pay, true},
+		)
+	}
+	rows = append(rows, row{"Hälytystyö (kiinteä)", out.CalloutHours, eff, out.CalloutPay, true})
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("%-32s %8s %8s %10s\n", "Nimike", "Tunnit", "e/h", "Summa e"))
+	b.WriteString(strings.Repeat("-", 62) + "\n")
+	for _, r := range rows {
+		if r.hasH {
+			b.WriteString(fmt.Sprintf("%-32s %8.2f %8.2f %10.2f\n", truncatePad(r.name, 32), r.hours, r.rate, r.sum))
+		} else {
+			b.WriteString(fmt.Sprintf("%-32s %8s %8s %10.2f\n", truncatePad(r.name, 32), "-", "-", r.sum))
+		}
+	}
+	b.WriteString(strings.Repeat("-", 62) + "\n")
+	b.WriteString(fmt.Sprintf("%-32s %8s %8s %10.2f\n", "Yhteensä", "", "", out.TotalPay))
+
+	if rules.PeriodOTEnabled {
 		b.WriteString(fmt.Sprintf(
-			"Jaksoylityö 50 %% (ensimmäiset 18 h): %.2f h / %.2f e\n"+
-				"Jaksoylityö 100 %%: %.2f h / %.2f e\n"+
-				"Jakson tunnit: %.2f + %.2f poissaoloa = %.2f (kynnys %.0f)\n",
-			out.PeriodOT50Hours, out.PeriodOT50Pay,
-			out.PeriodOT100Hours, out.PeriodOT100Pay,
+			"\nJakson tunnit: %.2f h työtä + %.2f h poissaoloa = %.2f h (kynnys %.0f h)\n",
 			out.PeriodWorkedHours, out.PeriodCreditedHours, out.PeriodTotalHours, out.PeriodThresholdH,
 		))
 	}
-	b.WriteString(fmt.Sprintf("Hälytystyö (kiinteä): %.2f h / %.2f e\n", out.CalloutHours, out.CalloutPay))
 	if len(out.Days) > 0 {
 		b.WriteString("\nPäiväkohtaisesti:\n")
+		b.WriteString(fmt.Sprintf("%-12s %8s\n", "Päivä", "Tunnit"))
+		b.WriteString(strings.Repeat("-", 22) + "\n")
 		for _, d := range out.Days {
-			line := fmt.Sprintf("- %s: %.2f h", formatFIDate(d.Date), d.Total)
+			name := formatFIDate(d.Date)
 			if d.HolidayName != "" {
-				line += " (" + d.HolidayName + ")"
+				name += " " + d.HolidayName
 			}
-			b.WriteString(line + "\n")
+			b.WriteString(fmt.Sprintf("%-12s %8.2f\n", truncatePad(name, 12), d.Total))
 		}
 	}
 	return b.String()
+}
+
+func eveningDoubleEnabled(rules calc.Rules) bool {
+	return rules.EveningDoubleMonthFrom != 0 || rules.EveningDoubleMonthTo != 0
+}
+
+func truncatePad(s string, width int) string {
+	runes := []rune(s)
+	if len(runes) > width {
+		return string(runes[:width-1]) + "."
+	}
+	return s
 }
 
 func formatFIDate(t time.Time) string {
@@ -499,7 +551,12 @@ func (s *shiftsTab) toCalcShifts() []calc.Shift {
 		if err != nil {
 			continue
 		}
-		out = append(out, calc.Shift{Start: start, End: end, Callout: sh.Callout})
+		out = append(out, calc.Shift{
+			Start:           start,
+			End:             end,
+			Callout:         sh.Callout,
+			PerehdytysHours: sh.perehdytysHours(),
+		})
 	}
 	return out
 }
@@ -534,6 +591,7 @@ func (s *settingsTab) rates() calc.Rates {
 		Saturday: entryFloatOr(s.saturdayAllowance, 0),
 		Sunday: entryFloatOr(s.sundayAllowance, 0),
 		Holiday: entryFloatOr(s.holidayAllowance, 0),
+		Perehdytys: entryFloatOr(s.perehdytysAllowance, 0),
 	}
 }
 

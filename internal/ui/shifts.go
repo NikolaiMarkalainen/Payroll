@@ -23,12 +23,14 @@ var finnishMonths = []string{
 
 // calendarShift is a shift shown inside a day cell.
 type calendarShift struct {
-	ID      int
-	Date    time.Time
-	Start   string
-	End     string
-	Callout bool   // Hälytysvuoro
-	Code    string // roster place/code label from import, if any
+	ID              int
+	Date            time.Time
+	Start           string
+	End             string
+	Callout         bool   // Hälytysvuoro
+	Code            string // roster place/code label from import, if any
+	PerehdytysStart string // orientation mentoring start HH:MM; empty = none
+	PerehdytysEnd   string // orientation mentoring end HH:MM
 }
 
 type shiftsTab struct {
@@ -86,6 +88,36 @@ func (s *shiftsTab) replaceShifts(shifts []calendarShift, month time.Time) {
 	}
 	s.month = time.Date(month.Year(), month.Month(), 1, 0, 0, 0, 0, month.Location())
 	s.refresh()
+}
+
+// mergeImportedShifts keeps existing calendar days and overlays incoming shifts
+// only on the days present in the import (so a new PDF does not wipe other periods).
+func (s *shiftsTab) mergeImportedShifts(incoming []calendarShift, focusMonth time.Time) (kept, replacedDays, added int) {
+	incomingDays := map[string]bool{}
+	for _, sh := range incoming {
+		incomingDays[calendarDayKey(sh.Date)] = true
+	}
+	replacedDays = len(incomingDays)
+
+	keptShifts := make([]calendarShift, 0, len(s.shifts))
+	for _, sh := range s.shifts {
+		key := calendarDayKey(sh.Date)
+		if incomingDays[key] {
+			continue
+		}
+		keptShifts = append(keptShifts, sh)
+		kept++
+	}
+	added = len(incoming)
+	merged := make([]calendarShift, 0, len(keptShifts)+len(incoming))
+	merged = append(merged, keptShifts...)
+	merged = append(merged, incoming...)
+	s.replaceShifts(merged, focusMonth)
+	return kept, replacedDays, added
+}
+
+func calendarDayKey(t time.Time) string {
+	return t.Format("2006-01-02")
 }
 
 func (s *shiftsTab) currentRules() allowanceRules {
@@ -269,12 +301,20 @@ func (s *shiftsTab) openShiftDialog(date time.Time, existing *calendarShift) {
 
 	startVal, endVal := "06:00", "14:00"
 	calloutChecked := false
+	pereChecked := false
+	pereStartVal, pereEndVal := startVal, endVal
 	editing := existing != nil
 	if editing {
 		startVal = existing.Start
 		endVal = existing.End
 		calloutChecked = existing.Callout
 		date = existing.Date
+		pereStartVal, pereEndVal = existing.Start, existing.End
+		if existing.PerehdytysStart != "" && existing.PerehdytysEnd != "" {
+			pereChecked = true
+			pereStartVal = existing.PerehdytysStart
+			pereEndVal = existing.PerehdytysEnd
+		}
 	}
 
 	startPicker := newTimePicker(startVal)
@@ -285,6 +325,38 @@ func (s *shiftsTab) openShiftDialog(date time.Time, existing *calendarShift) {
 	}
 	callout := widget.NewCheck(calloutLabel, nil)
 	callout.SetChecked(calloutChecked)
+
+	pereStart := newTimePicker(pereStartVal)
+	pereEnd := newTimePicker(pereEndVal)
+	pereTimes := container.NewVBox(
+		widget.NewForm(
+			widget.NewFormItem("Perehdytys alkaa", pereStart.canvas()),
+			widget.NewFormItem("Perehdytys loppuu", pereEnd.canvas()),
+		),
+	)
+	if !pereChecked {
+		pereTimes.Hide()
+	}
+	// Default perehdytys span = whole shift when the box is turned on
+	// (full-day mentoring without editing times). Keep saved times on open.
+	pereWasOn := pereChecked
+	pere := widget.NewCheck("Perehdytyslisä", func(on bool) {
+		if on {
+			if !pereWasOn {
+				if startPicker.valid() && endPicker.valid() {
+					pereStart.set(startPicker.value())
+					pereEnd.set(endPicker.value())
+				}
+			}
+			pereWasOn = true
+			pereTimes.Show()
+		} else {
+			pereWasOn = false
+			pereTimes.Hide()
+		}
+	})
+	pere.SetChecked(pereChecked)
+
 	formErr := widget.NewLabel("")
 	formErr.Importance = widget.DangerImportance
 	formErr.Hide()
@@ -296,6 +368,7 @@ func (s *shiftsTab) openShiftDialog(date time.Time, existing *calendarShift) {
 		widget.NewFormItem("Alkaa", startPicker.canvas()),
 		widget.NewFormItem("Loppuu", endPicker.canvas()),
 		widget.NewFormItem("", callout),
+		widget.NewFormItem("", pere),
 	)
 
 	title, confirm := "Lisää vuoro", "Lisää"
@@ -303,7 +376,7 @@ func (s *shiftsTab) openShiftDialog(date time.Time, existing *calendarShift) {
 		title, confirm = "Muokkaa vuoroa", "Tallenna"
 	}
 
-	body := container.NewVBox(dateLabel, form, formErr)
+	body := container.NewVBox(dateLabel, form, pereTimes, formErr)
 	var d dialog.Dialog
 	d = dialog.NewCustomConfirm(
 		title,
@@ -326,6 +399,24 @@ func (s *shiftsTab) openShiftDialog(date time.Time, existing *calendarShift) {
 				End:     endPicker.value(),
 				Callout: callout.Checked,
 			}
+			if pere.Checked {
+				pereStart.refreshError()
+				pereEnd.refreshError()
+				if !pereStart.valid() || !pereEnd.valid() {
+					formErr.SetText("Perehdytyksen ajat eivät kelpaa")
+					formErr.Show()
+					d.Show()
+					return
+				}
+				sh.PerehdytysStart = pereStart.value()
+				sh.PerehdytysEnd = pereEnd.value()
+				if h, err := clockSpanHours(sh.PerehdytysStart, sh.PerehdytysEnd); err != nil || h <= 0 {
+					formErr.SetText("Perehdytyksen kesto pitää olla yli 0 h")
+					formErr.Show()
+					d.Show()
+					return
+				}
+			}
 			var err error
 			if editing {
 				sh.ID = existing.ID
@@ -343,7 +434,7 @@ func (s *shiftsTab) openShiftDialog(date time.Time, existing *calendarShift) {
 		},
 		s.window,
 	)
-	d.Resize(fyne.NewSize(380, 340))
+	d.Resize(fyne.NewSize(400, 420))
 	d.Show()
 }
 

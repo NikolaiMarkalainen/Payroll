@@ -133,14 +133,64 @@ func (s *shiftsTab) segmentsOn(date time.Time) []shiftSegment {
 
 // shiftTitleLine is the place/code line shown above the time span.
 func shiftTitleLine(sh calendarShift) string {
+	pere := sh.hasPerehdytys()
 	switch {
+	case sh.Callout && pere && sh.Code != "":
+		return "H PERE *" + sh.Code
+	case sh.Callout && pere:
+		return "H PERE"
 	case sh.Callout && sh.Code != "":
 		return "H *" + sh.Code
 	case sh.Callout:
 		return "H"
+	case pere && sh.Code != "":
+		return "PERE *" + sh.Code
+	case pere:
+		return "PERE"
 	case sh.Code != "":
 		return "*" + sh.Code
 	default:
 		return ""
 	}
+}
+
+func (sh calendarShift) hasPerehdytys() bool {
+	return sh.PerehdytysStart != "" && sh.PerehdytysEnd != ""
+}
+
+func (sh calendarShift) perehdytysHours() float64 {
+	h, err := clockSpanHours(sh.PerehdytysStart, sh.PerehdytysEnd)
+	if err != nil || h <= 0 {
+		return 0
+	}
+	return h
+}
+
+// clockSpanHours returns duration in hours between two HH:MM clocks.
+// If end <= start, the span is treated as overnight (+24 h).
+func clockSpanHours(start, end string) (float64, error) {
+	s, err1 := clockToMinutes(start)
+	e, err2 := clockToMinutes(end)
+	if err1 != nil {
+		return 0, err1
+	}
+	if err2 != nil {
+		return 0, err2
+	}
+	if e <= s {
+		e += 24 * 60
+	}
+	return float64(e-s) / 60, nil
+}
+
+func addClockHours(hhmm string, hours int) string {
+	m, err := clockToMinutes(hhmm)
+	if err != nil {
+		return hhmm
+	}
+	m += hours * 60
+	for m >= 24*60 {
+		m -= 24 * 60
+	}
+	return fmt.Sprintf("%02d:%02d", m/60, m%60)
 }

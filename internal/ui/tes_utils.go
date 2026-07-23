@@ -75,6 +75,7 @@ func expHintText(family string) string {
 	case tesFamilyVartio:
 		return "Kokemuslisä = palvelusaikalisän erotus perustasoon. Henkilökohtainen lisä (TES 26) erikseen. " +
 			"Koulutuslisä (TES 25): 40 e/kk tai 0.25 e/h; ei kuulu ylityön perustuntipalkkaan. " +
+			"Perehdytyslisä: 1.00 e/h merkityille perehdytystunneille vuorossa (PERE). " +
 			"Muu lisä: tunneittain tai kiinteä summa jaksolle."
 	case tesFamilyKauppa:
 		return "Taulukkopalkka: tuntipalkka = 2 v -perus; palvelusvuodet (4/6/9) -> kokemuslisä e/h erikseen. " +

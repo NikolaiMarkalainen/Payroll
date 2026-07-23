@@ -154,6 +154,7 @@ func TestPDFTabImportAllSamples(t *testing.T) {
 			if len(res.Shifts) != tc.shifts {
 				t.Fatalf("parse shifts=%d want %d", len(res.Shifts), tc.shifts)
 			}
+			shifts.replaceShifts(nil, time.Date(2026, 7, 1, 0, 0, 0, 0, time.Local))
 			p.result = res
 			p.showPreview(res)
 			if issue := uiTextIssue(p.preview.Text); issue != "" {
@@ -172,6 +173,66 @@ func TestPDFTabImportAllSamples(t *testing.T) {
 				t.Fatal("calc range empty after import")
 			}
 		})
+	}
+}
+
+func TestPDFImportPreservesExistingShifts(t *testing.T) {
+	test.NewApp()
+	w := test.NewWindow(nil)
+	defer w.Close()
+
+	settings := newSettingsTab()
+	_ = settings.canvas()
+	shifts := newShiftsTab(w)
+	_ = shifts.canvas()
+	calc := newCalcTab(settings, shifts)
+	_ = calc.canvas()
+	p := newPDFTab(w, shifts, calc)
+	_ = p.canvas()
+
+	loc := time.Local
+	existing := []calendarShift{
+		{Date: time.Date(2026, 5, 10, 0, 0, 0, 0, loc), Start: "08:00", End: "16:00", Code: "KEEP"},
+		{Date: time.Date(2026, 5, 11, 0, 0, 0, 0, loc), Start: "12:00", End: "20:00", Code: "KEEP2"},
+	}
+	shifts.replaceShifts(existing, existing[0].Date)
+
+	path := filepath.Join("..", "pdfimport", "testdata", "henkilokohtainen-2.pdf")
+	if _, err := os.Stat(path); err != nil {
+		t.Skipf("missing %s: %v", path, err)
+	}
+	res, err := pdfimport.ParseFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.result = res
+	p.applyImport()
+
+	if len(shifts.shifts) != 2+len(res.Shifts) {
+		t.Fatalf("calendar shifts=%d want %d (existing+imported)", len(shifts.shifts), 2+len(res.Shifts))
+	}
+	foundKeep := false
+	foundKeep2 := false
+	foundImported := false
+	for _, sh := range shifts.shifts {
+		if sh.Code == "KEEP" && sh.Start == "08:00" {
+			foundKeep = true
+		}
+		if sh.Code == "KEEP2" {
+			foundKeep2 = true
+		}
+		if sh.Date.Month() == time.July && sh.Date.Day() == 3 {
+			foundImported = true
+		}
+	}
+	if !foundKeep || !foundKeep2 {
+		t.Fatalf("existing May shifts were wiped: %+v", shifts.shifts)
+	}
+	if !foundImported {
+		t.Fatal("imported July shift missing")
+	}
+	if !strings.Contains(p.status.Text, "säilyivät") {
+		t.Fatalf("status should mention preserved shifts: %q", p.status.Text)
 	}
 }
 

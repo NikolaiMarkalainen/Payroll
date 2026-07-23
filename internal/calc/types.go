@@ -8,6 +8,7 @@ type Rates struct {
 	Experience  float64 // kokemus- / palvelusaikalisä €/h
 	Personal    float64 // henkilökohtainen palkanosa €/h
 	Training    float64 // koulutuslisä €/h (TES 25 §; not in OT base)
+	Perehdytys  float64 // perehdytyslisä €/h (palkkalaji 20701; not in OT base)
 	OtherHourly float64 // muu lisä €/h (not in OT base)
 	OtherFixed  float64 // muu lisä kiinteä € / laskentajakso (not in OT base)
 	Evening     float64
@@ -79,9 +80,10 @@ type Rules struct {
 
 // Shift is one worked interval in absolute time.
 type Shift struct {
-	Start   time.Time
-	End     time.Time
-	Callout bool
+	Start            time.Time
+	End              time.Time
+	Callout          bool
+	PerehdytysHours  float64 // orientation mentoring hours in this shift (0 = none)
 }
 
 // DayHours is classified hours for one calendar day.
@@ -95,6 +97,7 @@ type DayHours struct {
 	Sunday         float64
 	Holiday        float64
 	Callout        float64
+	Perehdytys     float64
 	Overtime50     float64
 	Overtime100    float64
 	HolidayName    string
@@ -112,6 +115,7 @@ type Breakdown struct {
 	SundayHours         float64
 	HolidayHours        float64
 	CalloutHours        float64
+	PerehdytysHours     float64
 	Overtime50Hours     float64 // daily / shift / weekly OT 50 %
 	Overtime100Hours    float64 // pidennys / shift OT 100 %
 	WeeklyOT50Hours     float64 // subset of Overtime50 from weekly threshold
@@ -130,6 +134,7 @@ type Breakdown struct {
 	ExperiencePay  float64
 	PersonalPay    float64
 	TrainingPay    float64
+	PerehdytysPay  float64
 	OtherPay       float64
 	EveningPay       float64 // normal evening + double band
 	NightPay         float64

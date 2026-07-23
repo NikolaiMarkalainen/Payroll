@@ -27,6 +27,7 @@ func roundDay(dh *DayHours) {
 	dh.Sunday = roundHours(dh.Sunday)
 	dh.Holiday = roundHours(dh.Holiday)
 	dh.Callout = roundHours(dh.Callout)
+	dh.Perehdytys = roundHours(dh.Perehdytys)
 	dh.Overtime50 = roundHours(dh.Overtime50)
 	dh.Overtime100 = roundHours(dh.Overtime100)
 }

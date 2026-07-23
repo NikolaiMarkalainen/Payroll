@@ -2,11 +2,33 @@ package ui
 
 import (
 	"image/color"
+	"math"
 	"testing"
 	"time"
 
 	"fyne.io/fyne/v2/test"
 )
+
+func TestSummarizeDayPerehdytysChip(t *testing.T) {
+	day := time.Date(2026, 6, 20, 0, 0, 0, 0, time.Local)
+	got := summarizeDay(day, []calendarShift{{
+		Date: day, Start: "06:00", End: "14:00",
+		PerehdytysStart: "06:00", PerehdytysEnd: "06:35",
+	}}, defaultAllowanceRules())
+	want := roundHours(35.0 / 60.0)
+	if math.Abs(got.Perehdytys-want) > 0.01 {
+		t.Fatalf("pere=%v want %v", got.Perehdytys, want)
+	}
+	found := false
+	for _, c := range got.chips() {
+		if c.Code == codePerehdytys {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("chips=%+v missing PERE", got.chips())
+	}
+}
 
 func TestSummarizeDayEveningAndNight(t *testing.T) {
 	rules := defaultAllowanceRules()
@@ -126,7 +148,7 @@ func TestSplitOvertime50And100(t *testing.T) {
 
 func TestChipColorsDefined(t *testing.T) {
 	for _, code := range []string{
-		codeCallout, codeSunday, codeHoliday, codeEvening, codeNight, codeSaturday,
+		codeCallout, codePerehdytys, codeSunday, codeHoliday, codeEvening, codeNight, codeSaturday,
 		codeOvertime50, codeOvertime100,
 	} {
 		c := chipColor(code)
