@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/NikolaiMarkalainen/payroll/internal/ui"
+	"payroll/internal/ui"
 )
 
 func main() {

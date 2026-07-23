@@ -28,6 +28,9 @@ func TestSettingsDefaults(t *testing.T) {
 	if s.overtime50After.Text != "12" || s.overtime100After.Text != "18" {
 		t.Fatalf("overtime thresholds=%q/%q", s.overtime50After.Text, s.overtime100After.Text)
 	}
+	if s.colorShiftTitles == nil || !s.colorShiftTitles.Checked {
+		t.Fatal("shift title coloring should default on")
+	}
 	rules := s.allowanceRules()
 	if rules.overtime50AfterH != 12 || rules.overtime100AfterH != 18 {
 		t.Fatalf("rules OT=%v/%v", rules.overtime50AfterH, rules.overtime100AfterH)
@@ -65,5 +68,25 @@ func TestSettingsSaveUpdatesStatus(t *testing.T) {
 
 	if !strings.Contains(s.status.Text, "tallennettu") {
 		t.Fatalf("status=%q", s.status.Text)
+	}
+}
+
+func TestSettingsShiftColorSection(t *testing.T) {
+	test.NewApp()
+	w := test.NewWindow(nil)
+	defer w.Close()
+
+	s := newSettingsTab()
+	s.window = w
+	_ = s.canvas()
+
+	if s.colorShiftTitles == nil || !s.colorShiftTitles.Checked {
+		t.Fatal("coloring toggle missing/off")
+	}
+	if s.colorRows == nil {
+		t.Fatal("color rows missing")
+	}
+	if len(s.colorRows.Objects) != 0 {
+		t.Fatalf("no calendar shifts → 0 color groups, got %d", len(s.colorRows.Objects))
 	}
 }

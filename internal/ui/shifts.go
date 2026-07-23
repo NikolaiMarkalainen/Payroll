@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"image/color"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -22,11 +23,12 @@ var finnishMonths = []string{
 
 // calendarShift is a shift shown inside a day cell.
 type calendarShift struct {
-	ID int
-	Date time.Time
-	Start string
-	End string
-	Callout bool // Hälytysvuoro
+	ID      int
+	Date    time.Time
+	Start   string
+	End     string
+	Callout bool   // Hälytysvuoro
+	Code    string // roster place/code label from import, if any
 }
 
 type shiftsTab struct {
@@ -38,6 +40,12 @@ type shiftsTab struct {
 	grid *fyne.Container
 	content fyne.CanvasObject
 	rules func() allowanceRules
+	colorTitles func() bool
+	colorFor    func(code string) color.NRGBA
+	periodAnchor    func() (time.Time, bool)
+	periodThreshold func(day time.Time) (float64, bool)
+	selectedPeriod  func() (from, to time.Time, ok bool)
+	onChanged   func()
 	onDemoLoaded func()
 }
 
@@ -88,7 +96,7 @@ func (s *shiftsTab) currentRules() allowanceRules {
 }
 
 func (s *shiftsTab) canvas() fyne.CanvasObject {
-	hint := widget.NewLabel("Klikkaa päivää lisätäksesi vuoron. Klikkaa vuoroa muokataksesi. Poista X-napilla.")
+	hint := widget.NewLabel("Klikkaa päivää lisätäksesi vuoron. Klikkaa vuoroa muokataksesi. Poista X-napilla. J-numerot = 3 vk jaksot (ylityökorvaukset lasketaan jaksoittain).")
 	hint.Wrapping = fyne.TextWrapWord
 
 	heading := widget.NewLabel("Vuorokalenteri")
@@ -118,6 +126,7 @@ func (s *shiftsTab) canvas() fyne.CanvasObject {
 			heading,
 			hint,
 			allowanceLegend(),
+			periodLegend(),
 			widget.NewSeparator(),
 			nav,
 			headerRow,
@@ -154,17 +163,14 @@ func (s *shiftsTab) refresh() {
 
 	s.grid.Objects = cells
 	s.grid.Refresh()
+	if s.onChanged != nil {
+		s.onChanged()
+	}
 }
 
 func (s *shiftsTab) dayCell(date time.Time, isToday bool) fyne.CanvasObject {
-	dayLabel := widget.NewLabel(fmt.Sprintf("%d", date.Day()))
-	dayLabel.TextStyle = fyne.TextStyle{Bold: true}
-	if isToday {
-		dayLabel.Importance = widget.HighImportance
-	}
-
 	allow := summarizeDay(date, s.shifts, s.currentRules())
-	items := []fyne.CanvasObject{dayLabel}
+	items := []fyne.CanvasObject{s.dayHeader(date, isToday)}
 	if chips := allow.chips(); len(chips) > 0 {
 		items = append(items, chipRow(chips))
 	}
@@ -190,11 +196,10 @@ func (s *shiftsTab) dayCell(date time.Time, isToday bool) fyne.CanvasObject {
 }
 
 func (s *shiftsTab) shiftRow(seg shiftSegment) fyne.CanvasObject {
-	label := widget.NewLabel(seg.Label)
-	label.TextStyle = fyne.TextStyle{Italic: true}
+	body := s.shiftLabel(seg)
 
 	target := seg.Shift
-	edit := newTapBox(label, func() {
+	edit := newTapBox(body, func() {
 		s.openEditShiftDialog(target)
 	})
 
@@ -204,6 +209,43 @@ func (s *shiftsTab) shiftRow(seg shiftSegment) fyne.CanvasObject {
 	del.Importance = widget.LowImportance
 
 	return container.NewBorder(nil, nil, nil, del, edit)
+}
+
+func (s *shiftsTab) shiftLabel(seg shiftSegment) fyne.CanvasObject {
+	colorOn := s.colorTitles != nil && s.colorTitles() && seg.Shift.Code != ""
+	titleColor := shiftTitleColor(seg.Shift.Code)
+	if s.colorFor != nil {
+		titleColor = s.colorFor(seg.Shift.Code)
+	}
+
+	spanObj := func() fyne.CanvasObject {
+		if colorOn {
+			txt := canvas.NewText(seg.Span, titleColor)
+			txt.TextStyle = fyne.TextStyle{Italic: true}
+			txt.TextSize = theme.TextSize()
+			return txt
+		}
+		l := widget.NewLabel(seg.Span)
+		l.TextStyle = fyne.TextStyle{Italic: true}
+		return l
+	}
+
+	if seg.Title == "" {
+		return spanObj()
+	}
+
+	var titleObj fyne.CanvasObject
+	if colorOn {
+		txt := canvas.NewText(seg.Title, titleColor)
+		txt.TextStyle = fyne.TextStyle{Bold: true}
+		txt.TextSize = theme.TextSize()
+		titleObj = txt
+	} else {
+		l := widget.NewLabel(seg.Title)
+		l.TextStyle = fyne.TextStyle{Bold: true}
+		titleObj = l
+	}
+	return container.NewVBox(titleObj, spanObj())
 }
 
 func (s *shiftsTab) emptyCell() fyne.CanvasObject {
@@ -237,7 +279,11 @@ func (s *shiftsTab) openShiftDialog(date time.Time, existing *calendarShift) {
 
 	startPicker := newTimePicker(startVal)
 	endPicker := newTimePicker(endVal)
-	callout := widget.NewCheck("Hälytysvuoro", nil)
+	calloutLabel := "Hälytystyö"
+	if fixed := s.currentRules().calloutFixedH; fixed > 0 {
+		calloutLabel = fmt.Sprintf("Hälytystyö (kiinteä %.0f h palkka)", fixed)
+	}
+	callout := widget.NewCheck(calloutLabel, nil)
 	callout.SetChecked(calloutChecked)
 	formErr := widget.NewLabel("")
 	formErr.Importance = widget.DangerImportance
@@ -275,14 +321,15 @@ func (s *shiftsTab) openShiftDialog(date time.Time, existing *calendarShift) {
 				return
 			}
 			sh := calendarShift{
-				Date: date,
-				Start: startPicker.value(),
-				End: endPicker.value(),
+				Date:    date,
+				Start:   startPicker.value(),
+				End:     endPicker.value(),
 				Callout: callout.Checked,
 			}
 			var err error
 			if editing {
 				sh.ID = existing.ID
+				sh.Code = existing.Code
 				err = s.updateShift(sh)
 			} else {
 				err = s.addShift(sh)

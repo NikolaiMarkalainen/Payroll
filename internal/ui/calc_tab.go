@@ -9,31 +9,45 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
-	"github.com/NikolaiMarkalainen/payroll/internal/calc"
+	"payroll/internal/calc"
 )
 
 type calcTab struct {
 	settings *settingsTab
-	shifts *shiftsTab
-	from *widget.Entry
-	to *widget.Entry
-	absence *widget.Entry
-	err *widget.Label
-	summary *widget.Label
-	details *widget.Label
-	calcBtn *widget.Button
+	shifts   *shiftsTab
+	from     *widget.Entry
+	to       *widget.Entry
+	absence  *widget.Entry
+	err      *widget.Label
+	summary  *widget.Label
+	details  *widget.Label
+	calcBtn  *widget.Button
+
+	periodAnchor *widget.Entry
+	periodSelect *widget.Select
+	periodOpts   []periodOpt // parallel to periodSelect.Options
+	suppressPeriod bool
+	onPeriodRangeChanged func()
+}
+
+type periodOpt struct {
+	index int
+	from  time.Time
+	to    time.Time
+	label string
 }
 
 func newCalcTab(settings *settingsTab, shifts *shiftsTab) *calcTab {
 	c := &calcTab{
 		settings: settings,
-		shifts: shifts,
-		from: widget.NewEntry(),
-		to: widget.NewEntry(),
-		absence: widget.NewEntry(),
-		err: widget.NewLabel(""),
-		summary: widget.NewLabel("Laskentaa ei ole vielä ajettu."),
-		details: widget.NewLabel(""),
+		shifts:   shifts,
+		from:     widget.NewEntry(),
+		to:       widget.NewEntry(),
+		absence:  widget.NewEntry(),
+		err:      widget.NewLabel(""),
+		summary:  widget.NewLabel("Laskentaa ei ole vielä ajettu."),
+		details:  widget.NewLabel(""),
+		periodAnchor: widget.NewEntry(),
 	}
 	c.err.Importance = widget.DangerImportance
 	c.err.Hide()
@@ -43,6 +57,7 @@ func newCalcTab(settings *settingsTab, shifts *shiftsTab) *calcTab {
 	c.to.SetPlaceHolder("PP.KK.VVVV")
 	c.absence.SetPlaceHolder("0.00")
 	c.absence.SetText("0")
+	c.periodAnchor.SetPlaceHolder("PP.KK.VVVV")
 
 	now := time.Now()
 	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
@@ -50,15 +65,43 @@ func newCalcTab(settings *settingsTab, shifts *shiftsTab) *calcTab {
 	c.from.SetText(formatFIDate(start))
 	c.to.SetText(formatFIDate(end))
 
+	if settings != nil {
+		if a, ok := settings.periodAnchorDate(); ok {
+			c.periodAnchor.SetText(formatFIDate(a))
+		} else if settings.periodAnchor != nil {
+			c.periodAnchor.SetText(settings.periodAnchor.Text)
+		}
+	}
+
+	c.periodSelect = widget.NewSelect(nil, func(label string) {
+		if c.suppressPeriod {
+			return
+		}
+		c.applyPeriodSelection(label)
+	})
+	c.periodSelect.PlaceHolder = "Valitse 3 vk jakso"
+
+	c.periodAnchor.OnChanged = func(string) {
+		if c.suppressPeriod {
+			return
+		}
+		c.syncAnchorToSettings()
+		c.refreshPeriodOptions()
+		if c.onPeriodRangeChanged != nil {
+			c.onPeriodRangeChanged()
+		}
+	}
+
 	c.calcBtn = widget.NewButton("Laske palkka", func() {
 		c.run()
 	})
 	c.calcBtn.Importance = widget.HighImportance
+	c.refreshPeriodOptions()
 	return c
 }
 
 func (c *calcTab) canvas() fyne.CanvasObject {
-	hint := widget.NewLabel("Valitse aikaväli (mieluiten yksi 3 vk jakso) ja laske TES-pohjainen palkka. Poissaolotunnit (loma 6,7 h/pv, sairaus listan mukaan, arkipyhä, vuosivapaa...) lasketaan mukaan jaksoylityöhön.")
+	hint := widget.NewLabel("Aseta ankkuri (oletus 12.01 = vuoden J1). Valitse 3 vk jakso (J1, J2...) ja laske palkka. Poissaolotunnit (loma 6,7 h/pv, sairaus, arkipyhä, vuosivapaa...) lasketaan mukaan jaksoylityöhön.")
 	hint.Wrapping = fyne.TextWrapWord
 
 	heading := widget.NewLabel("Laskelma")
@@ -66,6 +109,11 @@ func (c *calcTab) canvas() fyne.CanvasObject {
 
 	rangeHeading := widget.NewLabel("Aikaväli")
 	rangeHeading.TextStyle = fyne.TextStyle{Bold: true}
+
+	periodForm := widget.NewForm(
+		widget.NewFormItem("Vuoden J1 alkaa (ankkuri)", c.periodAnchor),
+		widget.NewFormItem("Jakso (3 vk)", c.periodSelect),
+	)
 
 	form := widget.NewForm(
 		widget.NewFormItem("Alkaa", c.from),
@@ -76,8 +124,8 @@ func (c *calcTab) canvas() fyne.CanvasObject {
 	fillBtn := widget.NewButton("Täytä vuorojen mukaan", func() {
 		c.fillFromShifts()
 	})
-	periodBtn := widget.NewButton("Täytä 3 vk jakso ankkurista", func() {
-		c.fillPeriodFromAnchor()
+	periodBtn := widget.NewButton("Valitse jakso vuorojen mukaan", func() {
+		c.selectPeriodCoveringShifts()
 	})
 
 	resultHeading := widget.NewLabel("Tulos")
@@ -88,6 +136,7 @@ func (c *calcTab) canvas() fyne.CanvasObject {
 		hint,
 		widget.NewSeparator(),
 		rangeHeading,
+		periodForm,
 		form,
 		container.NewHBox(c.calcBtn, fillBtn, periodBtn),
 		c.err,
@@ -97,6 +146,152 @@ func (c *calcTab) canvas() fyne.CanvasObject {
 		c.details,
 	)
 	return container.NewPadded(container.NewVScroll(body))
+}
+
+func (c *calcTab) syncAnchorToSettings() {
+	if c.settings == nil || c.settings.periodAnchor == nil {
+		return
+	}
+	a, err := parseFIDate(c.periodAnchor.Text)
+	if err != nil {
+		return
+	}
+	c.settings.periodAnchor.SetText(formatFIDate(a))
+}
+
+func (c *calcTab) anchorDate() (time.Time, bool) {
+	if a, err := parseFIDate(c.periodAnchor.Text); err == nil {
+		return a, true
+	}
+	if c.settings != nil {
+		return c.settings.periodAnchorDate()
+	}
+	return time.Time{}, false
+}
+
+func (c *calcTab) refreshPeriodOptions() {
+	anchor, ok := c.anchorDate()
+	if !ok {
+		c.periodOpts = nil
+		if c.periodSelect != nil {
+			c.periodSelect.Options = nil
+			c.periodSelect.ClearSelected()
+			c.periodSelect.Refresh()
+		}
+		return
+	}
+	minIdx, maxIdx := c.periodIndexBounds(anchor)
+	opts := make([]periodOpt, 0, maxIdx-minIdx+1)
+	labels := make([]string, 0, maxIdx-minIdx+1)
+	for i := minIdx; i <= maxIdx; i++ {
+		from, to := calc.PeriodIndexWindow(anchor, i)
+		jn := periodYearNumber(from)
+		label := fmt.Sprintf("%s - %s  (J%d)", formatFIDate(from), formatFIDate(to), jn)
+		opts = append(opts, periodOpt{index: i, from: from, to: to, label: label})
+		labels = append(labels, label)
+	}
+	c.periodOpts = opts
+	was := c.suppressPeriod
+	c.suppressPeriod = true
+	c.periodSelect.Options = labels
+	// Keep selection if still in list; else pick period containing current from-date.
+	sel := ""
+	if from, err := parseFIDate(c.from.Text); err == nil {
+		idx := calc.PeriodIndexContaining(anchor, from)
+		for _, o := range opts {
+			if o.index == idx {
+				sel = o.label
+				break
+			}
+		}
+	}
+	if sel != "" {
+		c.periodSelect.SetSelected(sel)
+	} else if len(labels) > 0 {
+		c.periodSelect.SetSelected(labels[0])
+		c.setRange(opts[0].from, opts[0].to)
+	}
+	c.periodSelect.Refresh()
+	c.suppressPeriod = was
+}
+
+func (c *calcTab) periodIndexBounds(anchor time.Time) (minIdx, maxIdx int) {
+	coverFrom, coverTo := time.Time{}, time.Time{}
+	if c.shifts != nil {
+		for _, sh := range c.shifts.shifts {
+			d := sh.Date
+			if coverFrom.IsZero() || d.Before(coverFrom) {
+				coverFrom = d
+			}
+			if coverTo.IsZero() || d.After(coverTo) {
+				coverTo = d
+			}
+			if isOvernight(sh.Start, sh.End) {
+				next := d.AddDate(0, 0, 1)
+				if next.After(coverTo) {
+					coverTo = next
+				}
+			}
+		}
+	}
+	if coverFrom.IsZero() {
+		today := time.Now()
+		idx := calc.PeriodIndexContaining(anchor, today)
+		return idx - 2, idx + 10
+	}
+	minIdx = calc.PeriodIndexContaining(anchor, coverFrom)
+	maxIdx = calc.PeriodIndexContaining(anchor, coverTo)
+	// Pad one period on each side.
+	minIdx--
+	maxIdx++
+	if maxIdx < minIdx {
+		maxIdx = minIdx
+	}
+	return minIdx, maxIdx
+}
+
+func (c *calcTab) applyPeriodSelection(label string) {
+	for _, o := range c.periodOpts {
+		if o.label == label {
+			c.setRange(o.from, o.to)
+			c.err.Hide()
+			return
+		}
+	}
+}
+
+func (c *calcTab) selectPeriodCoveringShifts() {
+	anchor, ok := c.anchorDate()
+	if !ok {
+		c.showErr("Aseta 1. jakson alkupäivä (ankkuri), esim. 29.06.2026.")
+		return
+	}
+	c.syncAnchorToSettings()
+	c.refreshPeriodOptions()
+	if c.shifts == nil || len(c.shifts.shifts) == 0 {
+		c.showErr("Ei vuoroja kalenterissa.")
+		return
+	}
+	day := c.shifts.shifts[0].Date
+	for _, sh := range c.shifts.shifts {
+		if sh.Date.Before(day) {
+			day = sh.Date
+		}
+	}
+	idx := calc.PeriodIndexContaining(anchor, day)
+	for _, o := range c.periodOpts {
+		if o.index == idx {
+			c.suppressPeriod = true
+			c.periodSelect.SetSelected(o.label)
+			c.suppressPeriod = false
+			c.setRange(o.from, o.to)
+			c.err.Hide()
+			return
+		}
+	}
+	from, to := calc.PeriodIndexWindow(anchor, idx)
+	c.setRange(from, to)
+	c.err.Hide()
 }
 
 func (c *calcTab) fillFromShifts() {
@@ -120,35 +315,49 @@ func (c *calcTab) fillFromShifts() {
 			}
 		}
 	}
-	c.from.SetText(formatFIDate(minD))
-	c.to.SetText(formatFIDate(maxD))
+	c.setRange(minD, maxD)
+	c.refreshPeriodOptions()
 	c.err.Hide()
 }
 
 func (c *calcTab) fillPeriodFromAnchor() {
-	if c.settings == nil {
-		c.showErr("Asetuksia ei ole.")
-		return
-	}
-	anchor, ok := c.settings.periodAnchorDate()
-	if !ok {
-		c.showErr("Aseta jakson ankkuri Asetuksissa (PP.KK.VVVV).")
-		return
-	}
-	// Use "Alkaa" if set, else anchor, to pick which 3-week window.
-	day := anchor
-	if from, err := parseFIDate(c.from.Text); err == nil {
-		day = from
-	}
-	pFrom, pTo := calc.PeriodWindow(anchor, day)
-	c.from.SetText(formatFIDate(pFrom))
-	c.to.SetText(formatFIDate(pTo))
-	c.err.Hide()
+	c.selectPeriodCoveringShifts()
 }
 
 func (c *calcTab) setDemoRange() {
-	c.from.SetText("20.07.2026")
-	c.to.SetText("04.08.2026")
+	c.setRange(
+		time.Date(2026, 7, 20, 0, 0, 0, 0, time.Local),
+		time.Date(2026, 8, 4, 0, 0, 0, 0, time.Local),
+	)
+}
+
+func (c *calcTab) setRange(from, to time.Time) {
+	c.from.SetText(formatFIDate(from))
+	c.to.SetText(formatFIDate(to))
+	c.syncPeriodSelectToRange(from)
+	if c.onPeriodRangeChanged != nil {
+		c.onPeriodRangeChanged()
+	}
+}
+
+func (c *calcTab) syncPeriodSelectToRange(day time.Time) {
+	if c.periodSelect == nil || len(c.periodOpts) == 0 {
+		return
+	}
+	anchor, ok := c.anchorDate()
+	if !ok {
+		return
+	}
+	idx := calc.PeriodIndexContaining(anchor, day)
+	for _, o := range c.periodOpts {
+		if o.index == idx {
+			was := c.suppressPeriod
+			c.suppressPeriod = true
+			c.periodSelect.SetSelected(o.label)
+			c.suppressPeriod = was
+			return
+		}
+	}
 }
 
 func (c *calcTab) showErr(msg string) {
@@ -260,7 +469,7 @@ func formatCalcDetails(out calc.Breakdown, rules calc.Rules) string {
 			out.PeriodWorkedHours, out.PeriodCreditedHours, out.PeriodTotalHours, out.PeriodThresholdH,
 		))
 	}
-	b.WriteString(fmt.Sprintf("Hälytystunnit (seuranta): %.2f h\n", out.CalloutHours))
+	b.WriteString(fmt.Sprintf("Hälytystyö (kiinteä): %.2f h / %.2f e\n", out.CalloutHours, out.CalloutPay))
 	if len(out.Days) > 0 {
 		b.WriteString("\nPäiväkohtaisesti:\n")
 		for _, d := range out.Days {
@@ -350,6 +559,7 @@ func (s *settingsTab) calcRules() calc.Rules {
 		PeriodOT50AfterH: calc.DefaultPeriodOT50H,
 		WeeklyOTEnabled: s.weeklyOTEnabled != nil && s.weeklyOTEnabled.Checked,
 		WeeklyOTThresholdH: entryFloatOr(s.weeklyOTThreshold, 37.5),
+		CalloutFixedH: s.calloutFixedH,
 	}
 	useShiftOT := s.shiftOTEnabled == nil || s.shiftOTEnabled.Checked
 	if useShiftOT {

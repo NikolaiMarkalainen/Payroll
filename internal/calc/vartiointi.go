@@ -5,7 +5,10 @@ package calc
 
 // VartiointiRules matches Turvallisuusala / Vartiointiala TES.
 // TES 31 §: shift over 12 h → like OT at 50%; over 18 such hours in period → 100%.
+// TES 31 § hälytystyö: kiinteä 2 h palkka per hälytysvuoro.
 // TES 29 §: jaksoylityö defaults off until enabled in UI.
+const VartiointiCalloutFixedH = 2.0
+
 func VartiointiRules() Rules {
 	return Rules{
 		EveningStartMin:   18 * 60,
@@ -19,6 +22,7 @@ func VartiointiRules() Rules {
 		PeriodOTEnabled:   false,
 		PeriodThresholdH:  120,
 		PeriodOT50AfterH:  18,
+		CalloutFixedH:     VartiointiCalloutFixedH,
 	}
 }
 

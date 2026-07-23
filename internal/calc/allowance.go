@@ -5,12 +5,9 @@ import "time"
 // allowance.go — day-level allowance classification (ilta / yö / la / su / pyhä).
 // TES-specific quirks are configured via Rules (see kaupan.go, vartiointi.go), not if-branches here.
 
-func addDaySlice(dh *DayHours, start, end, dayStart time.Time, callout bool, rules Rules, holidays map[string]string) {
+func addDaySlice(dh *DayHours, start, end, dayStart time.Time, rules Rules, holidays map[string]string) {
 	hours := end.Sub(start).Hours()
 	dh.Total += hours
-	if callout {
-		dh.Callout += hours
-	}
 	switch dayStart.Weekday() {
 	case time.Saturday:
 		dh.Saturday += saturdayAllowanceHours(start, end, dayStart, rules)

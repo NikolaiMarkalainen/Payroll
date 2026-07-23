@@ -1,6 +1,10 @@
 package ui
 
-import "fmt"
+import (
+	"fmt"
+
+	"payroll/internal/calc"
+)
 
 const (
 	tesServicePerus = "Perus"
@@ -151,6 +155,7 @@ func (s *settingsTab) applyVartiointiPay(level string, pks bool, service string)
 	s.eveningDoubleMonthFrom = 0
 	s.eveningDoubleMonthTo = 0
 	s.eveningDoubleSundayOnly = false
+	s.calloutFixedH = calc.VartiointiCalloutFixedH
 	if s.periodOTEnabled != nil {
 		s.periodOTEnabled.SetChecked(true)
 	}

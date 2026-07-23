@@ -28,6 +28,7 @@ type allowanceRules struct {
 	saturdayEndMin int
 	overtime50AfterH float64
 	overtime100AfterH float64
+	calloutFixedH float64 // TES hälytystyö kiinteät tunnit (Vartio 2); 0 = ei korvausta
 	holidays map[string]bool // keys: 2006-01-02
 }
 
@@ -160,7 +161,13 @@ func summarizeDay(date time.Time, shifts []calendarShift, rules allowanceRules) 
 		hours := clipEnd.Sub(clipStart).Hours()
 		out.Total += hours
 		if sh.Callout {
-			out.Callout += hours
+			if rules.calloutFixedH > 0 {
+				// Kiinteä hälytyskorvaus kerran vuoron alkupäivälle (ei koko kesto).
+				absDay := time.Date(absStart.Year(), absStart.Month(), absStart.Day(), 0, 0, 0, 0, absStart.Location())
+				if absDay.Equal(dayStart) {
+					out.Callout += rules.calloutFixedH
+				}
+			}
 		}
 		if isSun {
 			out.Sunday += hours

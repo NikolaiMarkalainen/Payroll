@@ -3,7 +3,7 @@ package ui
 import (
 	"fmt"
 
-	"github.com/NikolaiMarkalainen/payroll/internal/calc"
+	"payroll/internal/calc"
 )
 
 const (
@@ -161,6 +161,7 @@ func (s *settingsTab) applyKaupanPay(group string, pks bool, service string) {
 	s.eveningDoubleMonthFrom = rules.EveningDoubleMonthFrom
 	s.eveningDoubleMonthTo = rules.EveningDoubleMonthTo
 	s.eveningDoubleSundayOnly = rules.EveningDoubleSundayOnly
+	s.calloutFixedH = rules.CalloutFixedH
 	if s.periodOTEnabled != nil {
 		s.periodOTEnabled.SetChecked(rules.PeriodOTEnabled)
 	}

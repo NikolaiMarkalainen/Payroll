@@ -5,9 +5,10 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+	"time"
 )
 
-const appID = "com.nikolaimarkalainen.payroll"
+const appID = "fi.palkkatarkistus.app"
 
 // Options configures app startup.
 type Options struct {
@@ -51,15 +52,52 @@ func RunWith(opts Options) {
 // buildUI constructs the main layout and returns it with the tab bar for tests.
 func buildUI(w fyne.Window) (fyne.CanvasObject, *container.AppTabs, *shiftsTab) {
 	settings := newSettingsTab()
+	settings.window = w
 	shifts := newShiftsTab(w)
 	shifts.rules = settings.allowanceRules
+	shifts.colorTitles = settings.colorShiftTitlesEnabled
+	shifts.colorFor = settings.colorForShiftCode
+	shifts.periodAnchor = settings.periodAnchorDate
+	shifts.periodThreshold = func(day time.Time) (float64, bool) {
+		if _, ok := settings.periodAnchorDate(); !ok {
+			return 0, false
+		}
+		return settings.periodThresholdForRange(day), true
+	}
+	settings.shiftsSource = func() []calendarShift { return shifts.shifts }
+	shifts.onChanged = func() { settings.refreshColorRows() }
 	settings.onSaved = func() { shifts.refresh() }
 	calcView := newCalcTab(settings, shifts)
+	shifts.selectedPeriod = func() (time.Time, time.Time, bool) {
+		from, err1 := parseFIDate(calcView.from.Text)
+		to, err2 := parseFIDate(calcView.to.Text)
+		if err1 != nil || err2 != nil {
+			return time.Time{}, time.Time{}, false
+		}
+		return from, to, true
+	}
+	calcView.onPeriodRangeChanged = func() { shifts.refresh() }
+
+	// Keep Laskelma ankkuri in sync with Asetukset; refresh calendar period highlights.
+	if settings.periodAnchor != nil {
+		settings.periodAnchor.OnChanged = func(s string) {
+			if calcView.suppressPeriod {
+				return
+			}
+			calcView.suppressPeriod = true
+			calcView.periodAnchor.SetText(s)
+			calcView.suppressPeriod = false
+			calcView.refreshPeriodOptions()
+			shifts.refresh()
+		}
+	}
+
+	pdfView := newPDFTab(w, shifts, calcView)
 
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Asetukset", settings.canvas()),
 		container.NewTabItem("Vuorot", shifts.canvas()),
-		container.NewTabItem("PDF-tuonti", emptyTab("PDF-tuonti")),
+		container.NewTabItem("PDF-tuonti", pdfView.canvas()),
 		container.NewTabItem("Laskelma", calcView.canvas()),
 		container.NewTabItem("Vertailu", emptyTab("Vertailu")),
 	)

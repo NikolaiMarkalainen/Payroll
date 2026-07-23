@@ -65,20 +65,31 @@ func thresholdForIndex(idx int, first float64) float64 {
 
 // PeriodWindow containing day, anchored at anchor (period 0 start).
 func PeriodWindow(anchor, day time.Time) (from, to time.Time) {
+	idx := PeriodIndexContaining(anchor, day)
+	return PeriodIndexWindow(anchor, idx)
+}
+
+// PeriodIndexContaining returns the 0-based period index for day (0 = anchor's first period).
+func PeriodIndexContaining(anchor, day time.Time) int {
 	a := truncateDay(anchor)
 	d := truncateDay(day)
-	var idx int
 	if d.Before(a) {
 		days := int(a.Sub(d).Hours() / 24)
-		idx = -(days / PeriodDays)
+		idx := -(days / PeriodDays)
 		if days%PeriodDays != 0 {
 			idx--
 		}
-	} else {
-		days := int(d.Sub(a).Hours() / 24)
-		idx = days / PeriodDays
+		return idx
 	}
-	from = a.AddDate(0, 0, idx*PeriodDays)
+	days := int(d.Sub(a).Hours() / 24)
+	return days / PeriodDays
+}
+
+// PeriodIndexWindow returns the [from,to] calendar days for period index
+// (0 = first 21 days starting at anchor).
+func PeriodIndexWindow(anchor time.Time, index int) (from, to time.Time) {
+	a := truncateDay(anchor)
+	from = a.AddDate(0, 0, index*PeriodDays)
 	to = from.AddDate(0, 0, PeriodDays-1)
 	return from, to
 }

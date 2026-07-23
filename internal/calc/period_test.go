@@ -36,6 +36,24 @@ func TestPeriodWindow(t *testing.T) {
 	}
 }
 
+func TestPeriodIndexWindow(t *testing.T) {
+	anchor := time.Date(2026, 6, 29, 0, 0, 0, 0, time.UTC)
+	from, to := PeriodIndexWindow(anchor, 0)
+	if !from.Equal(anchor) || to.Day() != 19 || to.Month() != time.July {
+		t.Fatalf("idx0=%v-%v", from, to)
+	}
+	from1, to1 := PeriodIndexWindow(anchor, 1)
+	if from1.Day() != 20 || from1.Month() != time.July || to1.Day() != 9 || to1.Month() != time.August {
+		t.Fatalf("idx1=%v-%v", from1, to1)
+	}
+	if PeriodIndexContaining(anchor, time.Date(2026, 7, 15, 0, 0, 0, 0, time.UTC)) != 0 {
+		t.Fatal("15.7 should be period 0")
+	}
+	if PeriodIndexContaining(anchor, time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC)) != 1 {
+		t.Fatal("20.7 should be period 1")
+	}
+}
+
 func TestSplitPeriodOvertime(t *testing.T) {
 	ot50, ot100 := splitPeriodOvertime(140, 128, 18)
 	if math.Abs(ot50-12) > 0.001 || math.Abs(ot100) > 0.001 {

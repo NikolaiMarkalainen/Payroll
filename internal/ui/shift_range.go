@@ -10,10 +10,11 @@ import (
 // shiftSegment is one visual block of a shift on a calendar day.
 // Overnight shifts (e.g. 22:00-06:00) render as two segments on consecutive days.
 type shiftSegment struct {
-	Shift calendarShift
-	Label string
-	Continues bool // ends at midnight, continues next day
-	Continuation bool // started previous day
+	Shift        calendarShift
+	Title        string // place/code above time, e.g. "*3AAA"
+	Span         string // time range, e.g. "04:55-14:30"
+	Continues    bool   // ends at midnight, continues next day
+	Continuation bool   // started previous day
 }
 
 func clockToMinutes(hhmm string) (int, error) {
@@ -96,18 +97,21 @@ func (s *shiftsTab) segmentsOn(date time.Time) []shiftSegment {
 	var out []shiftSegment
 	for _, sh := range s.shifts {
 		overnight := isOvernight(sh.Start, sh.End)
+		title := shiftTitleLine(sh)
 
 		if sameDate(sh.Date, date) {
 			if overnight {
 				out = append(out, shiftSegment{
-					Shift: sh,
-					Label: formatShiftLabel(sh, sh.Start+"-24:00"),
+					Shift:     sh,
+					Title:     title,
+					Span:      sh.Start + "-24:00",
 					Continues: true,
 				})
 			} else {
 				out = append(out, shiftSegment{
 					Shift: sh,
-					Label: formatShiftLabel(sh, sh.Start+"-"+sh.End),
+					Title: title,
+					Span:  sh.Start + "-" + sh.End,
 				})
 			}
 		}
@@ -116,8 +120,9 @@ func (s *shiftsTab) segmentsOn(date time.Time) []shiftSegment {
 			next := sh.Date.AddDate(0, 0, 1)
 			if sameDate(next, date) {
 				out = append(out, shiftSegment{
-					Shift: sh,
-					Label: formatShiftLabel(sh, "00:00-"+sh.End),
+					Shift:        sh,
+					Title:        title,
+					Span:         "00:00-" + sh.End,
 					Continuation: true,
 				})
 			}
@@ -126,9 +131,16 @@ func (s *shiftsTab) segmentsOn(date time.Time) []shiftSegment {
 	return out
 }
 
-func formatShiftLabel(sh calendarShift, span string) string {
-	if sh.Callout {
-		return "H " + span
+// shiftTitleLine is the place/code line shown above the time span.
+func shiftTitleLine(sh calendarShift) string {
+	switch {
+	case sh.Callout && sh.Code != "":
+		return "H *" + sh.Code
+	case sh.Callout:
+		return "H"
+	case sh.Code != "":
+		return "*" + sh.Code
+	default:
+		return ""
 	}
-	return span
 }

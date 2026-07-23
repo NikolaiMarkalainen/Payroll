@@ -8,7 +8,7 @@ import (
 
 	"fyne.io/fyne/v2/test"
 
-	"github.com/NikolaiMarkalainen/payroll/internal/calc"
+	"payroll/internal/calc"
 )
 
 func TestVartiointiRatesBridgeToCalculate(t *testing.T) {

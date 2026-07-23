@@ -79,13 +79,14 @@ func TestSummarizeDaySundaySaturdayHoliday(t *testing.T) {
 
 func TestSummarizeDayCalloutAndOvertime(t *testing.T) {
 	rules := defaultAllowanceRules()
+	rules.calloutFixedH = 2 // Vartiointi TES 31 §
 	day := time.Date(2026, 7, 15, 0, 0, 0, 0, time.UTC)
 	shifts := []calendarShift{{
 		Date: day, Start: "06:00", End: "16:00", Callout: true,
 	}}
 	got := summarizeDay(day, shifts, rules)
-	// 10h total -> under 12h shift OT threshold
-	if got.Total != 10 || got.Callout != 10 || got.Overtime50 != 0 || got.Overtime100 != 0 {
+	// 10h total -> under 12h shift OT; hälytys = kiinteä 2 h (ei koko vuoro)
+	if got.Total != 10 || got.Callout != 2 || got.Overtime50 != 0 || got.Overtime100 != 0 {
 		t.Fatalf("got=%+v", got)
 	}
 
@@ -94,7 +95,7 @@ func TestSummarizeDayCalloutAndOvertime(t *testing.T) {
 	}}
 	got = summarizeDay(day, shifts, rules)
 	// exactly 12h -> no extension OT
-	if got.Total != 12 || got.Overtime50 != 0 || got.Overtime100 != 0 {
+	if got.Total != 12 || got.Callout != 2 || got.Overtime50 != 0 || got.Overtime100 != 0 {
 		t.Fatalf("12h day got=%+v", got)
 	}
 
@@ -103,7 +104,7 @@ func TestSummarizeDayCalloutAndOvertime(t *testing.T) {
 	}}
 	got = summarizeDay(day, shifts, rules)
 	// 14h -> 2h extension @ 50% chip
-	if got.Total != 14 || got.Overtime50 != 2 || got.Overtime100 != 0 {
+	if got.Total != 14 || got.Callout != 2 || got.Overtime50 != 2 || got.Overtime100 != 0 {
 		t.Fatalf("14h day got=%+v", got)
 	}
 }
@@ -153,6 +154,9 @@ func TestSummarizeDayOvernightViaShiftsTab(t *testing.T) {
 
 	s := newShiftsTab(w)
 	_ = s.canvas()
+	rules := defaultAllowanceRules()
+	rules.calloutFixedH = 2
+	s.rules = func() allowanceRules { return rules }
 	day := time.Date(s.month.Year(), s.month.Month(), 10, 0, 0, 0, 0, s.month.Location())
 	next := day.AddDate(0, 0, 1)
 
@@ -163,9 +167,9 @@ func TestSummarizeDayOvernightViaShiftsTab(t *testing.T) {
 	start := summarizeDay(day, s.shifts, s.currentRules())
 	end := summarizeDay(next, s.shifts, s.currentRules())
 	if start.Night != 2 || start.Callout != 2 {
-		t.Fatalf("start=%+v", start)
+		t.Fatalf("start=%+v want night=2 callout=2 (fixed on start day)", start)
 	}
-	if end.Night != 6 || end.Callout != 6 {
-		t.Fatalf("end=%+v", end)
+	if end.Night != 6 || end.Callout != 0 {
+		t.Fatalf("end=%+v want night=6 callout=0 (fixed only on start day)", end)
 	}
 }

@@ -1,8 +1,11 @@
-module github.com/NikolaiMarkalainen/payroll
+module payroll
 
-go 1.23.2
+go 1.24.1
 
-require fyne.io/fyne/v2 v2.8.0
+require (
+	fyne.io/fyne/v2 v2.8.0
+	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
+)
 
 require (
 	fyne.io/systray v1.12.2 // indirect

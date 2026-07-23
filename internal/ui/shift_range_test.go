@@ -7,6 +7,21 @@ import (
 	"fyne.io/fyne/v2/test"
 )
 
+func TestShiftTitleLine(t *testing.T) {
+	if got := shiftTitleLine(calendarShift{}); got != "" {
+		t.Fatalf("empty=%q", got)
+	}
+	if got := shiftTitleLine(calendarShift{Code: "3AAA"}); got != "*3AAA" {
+		t.Fatalf("code=%q", got)
+	}
+	if got := shiftTitleLine(calendarShift{Callout: true, Code: "EXTRA"}); got != "H *EXTRA" {
+		t.Fatalf("callout+code=%q", got)
+	}
+	if got := shiftTitleLine(calendarShift{Callout: true}); got != "H" {
+		t.Fatalf("callout=%q", got)
+	}
+}
+
 func TestOvernightSegmentsSplitAcrossDays(t *testing.T) {
 	test.NewApp()
 	w := test.NewWindow(nil)
@@ -17,16 +32,16 @@ func TestOvernightSegmentsSplitAcrossDays(t *testing.T) {
 	day := time.Date(s.month.Year(), s.month.Month(), 10, 0, 0, 0, 0, s.month.Location())
 	next := day.AddDate(0, 0, 1)
 
-	if err := s.addShift(calendarShift{Date: day, Start: "22:00", End: "06:00"}); err != nil {
+	if err := s.addShift(calendarShift{Date: day, Start: "22:00", End: "06:00", Code: "2BBB"}); err != nil {
 		t.Fatal(err)
 	}
 
 	startSegs := s.segmentsOn(day)
-	if len(startSegs) != 1 || startSegs[0].Label != "22:00-24:00" || !startSegs[0].Continues {
+	if len(startSegs) != 1 || startSegs[0].Span != "22:00-24:00" || startSegs[0].Title != "*2BBB" || !startSegs[0].Continues {
 		t.Fatalf("start day segments=%+v", startSegs)
 	}
 	endSegs := s.segmentsOn(next)
-	if len(endSegs) != 1 || endSegs[0].Label != "00:00-06:00" || !endSegs[0].Continuation {
+	if len(endSegs) != 1 || endSegs[0].Span != "00:00-06:00" || endSegs[0].Title != "*2BBB" || !endSegs[0].Continuation {
 		t.Fatalf("next day segments=%+v", endSegs)
 	}
 	if startSegs[0].Shift.ID != endSegs[0].Shift.ID {

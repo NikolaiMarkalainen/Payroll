@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+	"image/color"
 )
 
 // settingsTab holds pay-calculation inputs the user provides.
@@ -61,6 +62,7 @@ type settingsTab struct {
 	eveningDoubleMonthFrom int
 	eveningDoubleMonthTo int
 	eveningDoubleSundayOnly bool
+	calloutFixedH           float64 // TES 31 hälytystyö: Vartio 2 h, else 0
 	periodOTEnabled         *widget.Check
 	periodMode              *widget.Select
 	periodFirstThreshold    *widget.Select
@@ -70,6 +72,14 @@ type settingsTab struct {
 	periodOTSection         fyne.CanvasObject
 	periodAdvancedSection   fyne.CanvasObject
 	profileSelectorsSection fyne.CanvasObject
+	colorShiftTitles        *widget.Check
+	shiftColorOverrides     map[string]color.NRGBA
+	shiftColorManual        map[string]struct{}
+	colorRows               *fyne.Container
+	colorEmptyHint          *widget.Label
+	colorExtraEntry         *widget.Entry
+	shiftsSource            func() []calendarShift
+	window                  fyne.Window
 	status                  *widget.Label
 	saveBtn                 *widget.Button
 	onSaved                 func()
@@ -177,13 +187,11 @@ func newSettingsTab() *settingsTab {
 	s.periodMode.SetSelected(periodMode120)
 	s.periodFirstThreshold.SetSelected("128 h (1. jakso)")
 	s.periodAnchor.SetPlaceHolder("PP.KK.VVVV")
-	// Default: Monday of current week aligned to a sample period start.
-	now := time.Now()
-	anchor := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	for anchor.Weekday() != time.Monday {
-		anchor = anchor.AddDate(0, 0, -1)
-	}
-	s.periodAnchor.SetText(formatFIDate(anchor))
+	// Default: 12.01 of the current payroll year (J1 = 12.01 - 01.02).
+	s.periodAnchor.SetText(formatFIDate(defaultPeriodYearAnchor(time.Now())))
+
+	s.colorShiftTitles = widget.NewCheck("Väritä vuorojen otsikot koodin mukaan", nil)
+	s.colorShiftTitles.SetChecked(true)
 
 	return s
 }
@@ -279,7 +287,7 @@ func (s *settingsTab) canvas() fyne.CanvasObject {
 	s.periodAdvancedSection = widget.NewForm(
 		widget.NewFormItem("Jakson malli", s.periodMode),
 		widget.NewFormItem("Ensimmäinen jakso", s.periodFirstThreshold),
-		widget.NewFormItem("Jakson ankkuri", s.periodAnchor),
+		widget.NewFormItem("Vuoden J1 (12.01)", s.periodAnchor),
 	)
 	s.periodOTSection = container.NewVBox(
 		s.periodHeading,
@@ -289,6 +297,8 @@ func (s *settingsTab) canvas() fyne.CanvasObject {
 		),
 		s.periodAdvancedSection,
 	)
+
+	calendarSection := s.buildCalendarSection()
 
 	profileHeading := widget.NewLabel("TES-pohja")
 	profileHeading.TextStyle = fyne.TextStyle{Bold: true}
@@ -307,6 +317,14 @@ func (s *settingsTab) canvas() fyne.CanvasObject {
 	})
 	s.saveBtn = save
 
+	if s.colorShiftTitles != nil {
+		s.colorShiftTitles.OnChanged = func(bool) {
+			if s.onSaved != nil {
+				s.onSaved()
+			}
+		}
+	}
+
 	tesHeader := container.NewVBox(
 		hint,
 		widget.NewSeparator(),
@@ -317,6 +335,8 @@ func (s *settingsTab) canvas() fyne.CanvasObject {
 
 	scrollBody := container.NewVBox(
 		s.profileSelectorsSection,
+		widget.NewSeparator(),
+		calendarSection,
 		widget.NewSeparator(),
 		payHeading,
 		payForm,
@@ -349,6 +369,7 @@ func (s *settingsTab) canvas() fyne.CanvasObject {
 
 func (s *settingsTab) allowanceRules() allowanceRules {
 	r := defaultAllowanceRules()
+	r.calloutFixedH = s.calloutFixedH
 	if s.eveningStart != nil {
 		if m, err := clockToMinutes(s.eveningStart.value()); err == nil {
 			r.eveningStartMin = m
@@ -411,4 +432,8 @@ func midnightStartMinutes(m int) int {
 		return 0
 	}
 	return m
+}
+
+func (s *settingsTab) colorShiftTitlesEnabled() bool {
+	return s != nil && s.colorShiftTitles != nil && s.colorShiftTitles.Checked
 }

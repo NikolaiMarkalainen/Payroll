@@ -70,6 +70,11 @@ type Rules struct {
 	PeriodOTEnabled  bool
 	PeriodThresholdH float64 // 120, 128 or 112
 	PeriodOT50AfterH float64 // typically 18
+
+	// CalloutFixedH (TES 31 § hälytystyö): when > 0, each Callout-tagged shift
+	// pays this many hours of EffectiveHourly as a fixed sum (Vartiointi: 2).
+	// 0 = no hälytyskorvaus (e.g. Kauppa / Oma).
+	CalloutFixedH float64
 }
 
 // Shift is one worked interval in absolute time.
@@ -135,6 +140,7 @@ type Breakdown struct {
 	Overtime100Pay   float64
 	PeriodOT50Pay    float64
 	PeriodOT100Pay   float64
+	CalloutPay       float64 // hälytystyö: CalloutHours × EffectiveHourly
 	TotalPay         float64
 }
 

@@ -52,4 +52,7 @@ func TestVartiointiRulesIsDefault(t *testing.T) {
 	if a.ShiftOTAfterH != 12 || a.ShiftOT50CapH != 18 {
 		t.Fatalf("vartio shift OT=%v/%v", a.ShiftOTAfterH, a.ShiftOT50CapH)
 	}
+	if a.CalloutFixedH != VartiointiCalloutFixedH {
+		t.Fatalf("vartio callout fixed=%v want %v", a.CalloutFixedH, VartiointiCalloutFixedH)
+	}
 }

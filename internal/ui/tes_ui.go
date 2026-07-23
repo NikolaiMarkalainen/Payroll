@@ -93,7 +93,7 @@ func (s *settingsTab) syncTESVisibility(family string) {
 			s.periodHeading.SetText("Tasoittumisjakso (jaksoylityö)")
 		}
 		if s.periodHint != nil {
-			s.periodHint.SetText("Tasoittumisjaksossa 128 h ja 112 h vuorottelevat (keskiarvo 120 h / 3 vk). Ankkuri = ensimmäisen jakson alkupäivä. Poissaolotunnit syötetään Laskelma-välilehdellä.")
+			s.periodHint.SetText("Tasoittumisjaksossa 128 h ja 112 h vuorottelevat (keskiarvo 120 h / 3 vk). Ankkuri = vuoden J1 alkupäivä (oletus 12.01). Poissaolotunnit syötetään Laskelma-välilehdellä.")
 		}
 	}
 
@@ -185,6 +185,7 @@ func (s *settingsTab) applyCustomBarebones() {
 	s.eveningDoubleMonthFrom = 0
 	s.eveningDoubleMonthTo = 0
 	s.eveningDoubleSundayOnly = false
+	s.calloutFixedH = 0
 	if s.periodOTEnabled != nil {
 		s.periodOTEnabled.SetChecked(true)
 	}
