@@ -28,6 +28,7 @@ type calcTab struct {
 	periodOpts   []periodOpt // parallel to periodSelect.Options
 	suppressPeriod bool
 	onPeriodRangeChanged func()
+	onPersist            func() // disk save (range / absence / anchor)
 }
 
 type periodOpt struct {
@@ -338,6 +339,9 @@ func (c *calcTab) setRange(from, to time.Time) {
 	c.syncPeriodSelectToRange(from)
 	if c.onPeriodRangeChanged != nil {
 		c.onPeriodRangeChanged()
+	}
+	if c.onPersist != nil {
+		c.onPersist()
 	}
 }
 

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -61,13 +62,57 @@ func TestSettingsSaveUpdatesStatus(t *testing.T) {
 	w := test.NewWindow(content)
 	defer w.Close()
 
+	dir := t.TempDir()
+	shifts := newShiftsTab(nil)
+	calc := newCalcTab(s, shifts)
+	p := newAppPersister(dir, s, shifts, calc)
+	wirePersistence(s, shifts, calc, p)
+
 	if s.saveBtn == nil {
 		t.Fatal("save button missing")
 	}
 	test.Tap(s.saveBtn)
 
-	if !strings.Contains(s.status.Text, "tallennettu") {
+	if !strings.Contains(s.status.Text, "Tallennettu:") {
 		t.Fatalf("status=%q", s.status.Text)
+	}
+	if _, err := os.Stat(statePath(dir)); err != nil {
+		t.Fatalf("state file missing: %v", err)
+	}
+}
+
+func TestPersistRestoresTESFamily(t *testing.T) {
+	test.NewApp()
+	dir := t.TempDir()
+
+	s := newSettingsTab()
+	_ = s.canvas()
+	s.tesFamily.SetSelected(tesFamilyVartio)
+	s.applyVartiointiPay("Taso III", true, tesService7y)
+
+	shifts := newShiftsTab(nil)
+	p := newAppPersister(dir, s, shifts, nil)
+	if err := p.saveNow(); err != nil {
+		t.Fatal(err)
+	}
+
+	s2 := newSettingsTab()
+	_ = s2.canvas()
+	if s2.tesFamily.Selected != tesFamilyCustom {
+		t.Fatalf("precondition: default family=%q", s2.tesFamily.Selected)
+	}
+	p2 := newAppPersister(dir, s2, newShiftsTab(nil), nil)
+	if err := p2.load(); err != nil {
+		t.Fatal(err)
+	}
+	if s2.tesFamily.Selected != tesFamilyVartio {
+		t.Fatalf("family=%q want Vartio", s2.tesFamily.Selected)
+	}
+	if s2.tesLevel.Selected != "Taso III" {
+		t.Fatalf("level=%q", s2.tesLevel.Selected)
+	}
+	if s2.experienceTier.Selected != tesService7y {
+		t.Fatalf("service=%q", s2.experienceTier.Selected)
 	}
 }
 

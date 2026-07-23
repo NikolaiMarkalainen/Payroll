@@ -173,7 +173,7 @@ func TestShiftsTabInMainUI(t *testing.T) {
 	w := test.NewWindow(nil)
 	defer w.Close()
 
-	content, tabs, _ := buildUI(w)
+	content, tabs, _, _, _ := buildUI(w)
 	w.SetContent(content)
 
 	tabs.SelectIndex(1)

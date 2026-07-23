@@ -3,7 +3,7 @@ tmp_dir = "tmp"
 
 [build]
   bin = "./tmp/payroll"
-  cmd = "go build -o ./tmp/payroll ./cmd/"
+  cmd = "go build -o ./tmp/payroll ./cmd/palkkatarkistus"
   delay = 800
   exclude_dir = ["bin", "tmp", "vendor", ".git"]
   exclude_file = []

@@ -64,6 +64,19 @@ func (o *optionSelect) SetSelected(text string) {
 	o.Refresh()
 }
 
+// forceSelected sets the value without OnChanged and without requiring it
+// to already be in Options (used when restoring persisted TES state).
+func (o *optionSelect) forceSelected(text string) {
+	if o == nil {
+		return
+	}
+	o.Selected = text
+	if o.button != nil {
+		o.button.SetText(o.displayText())
+	}
+	o.Refresh()
+}
+
 func (o *optionSelect) SetOptions(options []string) {
 	o.Options = append([]string(nil), options...)
 	o.Refresh()

@@ -21,6 +21,7 @@ func (s *settingsTab) applyTESFamily(name string) {
 	}
 	s.ensureTESFamilyOptions()
 	dispatchTESFamilyApply(s, name)
+	s.requestPersist()
 }
 
 func (s *settingsTab) applyFromSelectors() {
@@ -28,6 +29,15 @@ func (s *settingsTab) applyFromSelectors() {
 		return
 	}
 	dispatchTESFromSelectors(s, s.tesFamily.Selected)
+	if !s.suppressTESCallback {
+		s.requestPersist()
+	}
+}
+
+func (s *settingsTab) requestPersist() {
+	if s.onPersist != nil {
+		s.onPersist()
+	}
 }
 
 func (s *settingsTab) applyExperienceTier(tier string) {
@@ -39,6 +49,10 @@ func (s *settingsTab) applyExperienceTier(tier string) {
 }
 
 func (s *settingsTab) setProfileSelectorsForFamily(family string) {
+	s.setProfileSelectorsForFamilyOpts(family, true)
+}
+
+func (s *settingsTab) setProfileSelectorsForFamilyOpts(family string, applyDefaults bool) {
 	if s.tesLevel == nil || s.experienceTier == nil {
 		return
 	}
@@ -48,13 +62,15 @@ func (s *settingsTab) setProfileSelectorsForFamily(family string) {
 
 	spec := profileSelectorsForFamily(family)
 	if !spec.KeepCurrentOpts {
-		s.tesLevel.Options = spec.Levels
-		s.experienceTier.Options = spec.Services
-		if !containsString(spec.Levels, s.tesLevel.Selected) {
-			s.tesLevel.SetSelected(spec.DefaultLevel)
-		}
-		if !containsString(spec.Services, s.experienceTier.Selected) {
-			s.experienceTier.SetSelected(spec.DefaultService)
+		s.tesLevel.Options = append([]string(nil), spec.Levels...)
+		s.experienceTier.Options = append([]string(nil), spec.Services...)
+		if applyDefaults {
+			if !containsString(spec.Levels, s.tesLevel.Selected) {
+				s.tesLevel.forceSelected(spec.DefaultLevel)
+			}
+			if !containsString(spec.Services, s.experienceTier.Selected) {
+				s.experienceTier.forceSelected(spec.DefaultService)
+			}
 		}
 	}
 	s.tesLevel.Refresh()

@@ -84,6 +84,7 @@ type settingsTab struct {
 	status                  *widget.Label
 	saveBtn                 *widget.Button
 	onSaved                 func()
+	onPersist               func() // silent auto-save (TES change, etc.)
 	suppressTESCallback     bool
 }
 
@@ -315,10 +316,11 @@ func (s *settingsTab) canvas() fyne.CanvasObject {
 	rulesHeading.TextStyle = fyne.TextStyle{Bold: true}
 
 	save := widget.NewButton("Tallenna", func() {
-		s.status.SetText("Asetukset tallennettu istuntoon.")
 		if s.onSaved != nil {
 			s.onSaved()
+			return
 		}
+		s.status.SetText("Tallennus ei ole kytketty.")
 	})
 	s.saveBtn = save
 

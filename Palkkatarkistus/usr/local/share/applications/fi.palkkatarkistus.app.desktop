@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Palkkatarkistus
+Exec=Palkkatarkistus
+Icon=fi.palkkatarkistus.app
+Keywords=fyne;
+StartupWMClass=Palkkatarkistus
+

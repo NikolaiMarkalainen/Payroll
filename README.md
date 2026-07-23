@@ -12,4 +12,17 @@ make build      # bin/payroll
 make air        # live reload + demo-vuorot (vaatii airin)
 ```
 
+## Paketointi (Linux / Mac / Windows)
+
+Sovelluskuvake: `Icon.png`. Ohjeet: [PACKAGING.md](PACKAGING.md).
+
+```bash
+make package-linux    # tämä kone (Linux .tar.xz + pikakuvake)
+make install-linux    # asenna ~/.localiin (näkyy sovellusvalikossa)
+make uninstall-linux  # poista ~/.local-asennus
+make cross-windows    # Windows (Docker + fyne-cross)
+make cross-darwin     # macOS (Docker + SDK)
+make cross-all        # kaikki alustat
+```
+
 MIT — `LICENSE`.

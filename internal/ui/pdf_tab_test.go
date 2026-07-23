@@ -17,7 +17,7 @@ func TestPDFTabInAppTabs(t *testing.T) {
 	test.NewApp()
 	w := test.NewWindow(nil)
 	defer w.Close()
-	_, tabs, _ := buildUI(w)
+	_, tabs, _, _, _ := buildUI(w)
 	found := false
 	for _, it := range tabs.Items {
 		if it.Text == "PDF-tuonti" {
